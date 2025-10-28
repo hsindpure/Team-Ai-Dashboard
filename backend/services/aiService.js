@@ -2,9 +2,10 @@
 
 class AIService {
     constructor() {
-      this.apiKey = process.env.OPENROUTER_API_KEY;
-      this.baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
-      
+      this.apiKey = process.env.GEMINI_API_KEY;
+      // Using gemini-2.5-flash - stable model available in Google AI Studio free tier
+      this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+
       // Enhanced cache with size limits
       this.cache = new Map();
       this.maxCacheSize = 100; // Limit cache entries
@@ -89,53 +90,52 @@ class AIService {
       if (!this.apiKey) {
         throw new Error('AI API key not configured');
       }
-      
+
       const prompt = this.buildOptimizedPrompt(optimizedSchema, sampleData);
-      
+
       // Validate prompt size
       if (prompt.length > this.maxTokensPerRequest * 3) {
         console.warn('Prompt too large, using fallback');
         throw new Error('Dataset too large for AI analysis');
       }
-      
+
+      const systemPrompt = "You are a business intelligence consultant helping executives understand their data and make strategic decisions. Focus on business value, not just technical metrics.";
+      const fullPrompt = `${systemPrompt}\n\n${prompt}`;
+
       const requestPayload = {
-        model: "openai/gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a data visualization expert. Provide concise, actionable insights for large datasets."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        max_tokens: 1500, // Limit response size
-        temperature: 0.7
+        contents: [{
+          parts: [{
+            text: fullPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1500
+        }
       };
-      
+
       const response = await fetch(this.baseUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "x-goog-api-key": this.apiKey
         },
         body: JSON.stringify(requestPayload),
         timeout: 30000 // 30 second timeout
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`AI API error: ${response.status} - ${errorText}`);
       }
-      
+
       const data = await response.json();
-      const content = data.choices[0]?.message?.content;
-      
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
       if (!content) {
         throw new Error('No AI response received');
       }
-      
+
       return this.parseAIResponse(content, optimizedSchema);
     }
 
@@ -148,25 +148,81 @@ class AIService {
         `${d.name} (${d.type}, ${d.uniqueValues} unique values)`
       ).join(', ');
 
-      // Simplified prompt for large datasets
-      const prompt = `Analyze this ${schema.totalRows} row dataset and suggest 4 KPIs and 4 charts:
+      // Business-focused prompt for dashboard generation
+      const prompt = `You are analyzing a ${schema.totalRows}-row business dataset. Think like an executive advisor.
 
+**DATASET:**
 MEASURES: ${measures || 'None'}
 DIMENSIONS: ${dimensions || 'None'}
 
-Focus on:
-1. Business-relevant KPIs (sum, avg, count, max, min)
-2. Effective chart types (bar, line, pie, area)
-3. Performance-optimized visualizations
+**YOUR TASK:**
 
-Return JSON:
+1. **IDENTIFY BUSINESS DOMAIN:** What type of business data is this? (Sales, HR, Finance, Marketing, Operations, Customer Analytics, etc.)
+
+2. **SUGGEST 4 STRATEGIC KPIs:**
+   - Each KPI must answer a critical business question
+   - Focus on decision-driving metrics, not just calculations
+   - Examples of GOOD KPIs:
+     ✓ "Total Revenue" → answers "How much are we making?"
+     ✓ "Customer Growth Rate" → answers "Are we growing?"
+     ✓ "Average Order Value" → answers "How valuable is each sale?"
+   - Examples of BAD KPIs:
+     ✗ "Count of rows" (technical, not strategic)
+     ✗ "Sum of column A" (doesn't tell business story)
+
+3. **RECOMMEND 4 BUSINESS CHARTS:**
+   - Each chart must reveal a business insight or support a decision
+   - Explain WHY this chart matters (not just what it shows)
+   - Examples of GOOD chart reasoning:
+     ✓ "Revenue by Region Bar Chart → Identifies top markets for expansion investment"
+     ✓ "Sales Trend Line Chart → Reveals growth acceleration or decline for forecasting"
+     ✓ "Product Category Pie Chart → Shows revenue concentration for diversification strategy"
+   - Examples of BAD chart reasoning:
+     ✗ "Bar chart shows data" (technical description)
+     ✗ "Line chart for trends" (generic, no business value)
+
+4. **PROVIDE BUSINESS INSIGHTS:**
+   - What strategic observations can you make?
+   - What opportunities or risks do you see?
+   - What questions should executives be asking?
+
+**OUTPUT FORMAT (JSON only, no markdown):**
 {
-  "kpis": [{"name": "Total Sales", "calculation": "sum", "column": "sales", "format": "currency"}],
-  "charts": [{"title": "Sales by Region", "type": "bar", "measures": ["sales"], "dimensions": ["region"]}],
-  "insights": ["Key business insights"]
+  "businessDomain": "E-commerce Sales",
+  "kpis": [
+    {
+      "name": "Total Revenue",
+      "calculation": "sum",
+      "column": "revenue",
+      "format": "currency",
+      "businessQuestion": "What is our total sales performance?",
+      "strategicValue": "Primary growth indicator for investment decisions"
+    }
+  ],
+  "charts": [
+    {
+      "title": "Revenue Growth Over Time",
+      "type": "line",
+      "measures": ["revenue"],
+      "dimensions": ["date"],
+      "businessPurpose": "Track revenue trajectory to identify growth acceleration",
+      "expectedInsight": "Seasonal patterns and growth trends",
+      "actionableFor": "Sales forecasting and goal setting"
+    }
+  ],
+  "insights": [
+    "Revenue shows 35% YoY growth - strong expansion momentum",
+    "Top 3 products drive 60% of sales - diversification opportunity exists"
+  ]
 }
 
-Keep response concise for performance.`;
+**CRITICAL RULES:**
+- Every KPI must answer "What business question does this answer?"
+- Every chart must explain "What decision does this support?"
+- Insights must be strategic (growth/opportunity/risk), not technical (data quality/completeness)
+- Think: "What would a CEO/VP want to know?"
+
+Keep response concise but business-focused.`;
 
       return prompt;
     }
@@ -216,33 +272,32 @@ Keep response concise for performance.`;
       }
 
       const prompt = this.buildOptimizedCustomPrompt(
-        schema, 
-        selectedMeasures, 
-        selectedDimensions, 
+        schema,
+        selectedMeasures,
+        selectedDimensions,
         sampleData
       );
 
+      const systemPrompt = "You are a data storytelling expert helping business users create dashboards that drive strategic decisions. Focus on business insights, not just technical performance.";
+      const fullPrompt = `${systemPrompt}\n\n${prompt}`;
+
       const requestPayload = {
-        model: "openai/gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system", 
-            content: "You are an expert at creating performance-optimized data visualizations for large datasets."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        max_tokens: 1000, // Reduced for performance
-        temperature: 0.5
+        contents: [{
+          parts: [{
+            text: fullPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 1000
+        }
       };
 
       const response = await fetch(this.baseUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "x-goog-api-key": this.apiKey
         },
         body: JSON.stringify(requestPayload)
       });
@@ -253,8 +308,8 @@ Keep response concise for performance.`;
       }
 
       const data = await response.json();
-      const content = data.choices[0]?.message?.content;
-      
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
       if (!content) {
         throw new Error('No AI response received');
       }
@@ -270,29 +325,64 @@ Keep response concise for performance.`;
         dimensionCount: selectedDimensions.length
       };
       
-      const prompt = `Create 3 optimized chart combinations for this data selection:
+      const prompt = `You are helping a business user create insightful charts. The user has selected specific data fields they want to analyze.
 
+**USER'S SELECTION:**
 MEASURES: ${selectedMeasures.join(', ')}
 DIMENSIONS: ${selectedDimensions.join(', ')}
 SAMPLE SIZE: ${dataInsights.sampleSize} records
 
-Focus on performance-optimized charts suitable for large datasets.
+**YOUR TASK:**
+Create 3 strategic chart combinations that tell a compelling business story with this data.
 
-Return JSON only:
+**THINK LIKE A BUSINESS ANALYST:**
+1. What business questions can these measures and dimensions answer together?
+2. What patterns, trends, or comparisons would be most valuable?
+3. What decisions could executives make from these charts?
+
+**CHART REQUIREMENTS:**
+For each chart, you MUST explain:
+- **businessPurpose**: What business question does this chart answer?
+- **expectedInsight**: What pattern or trend will this reveal?
+- **actionableFor**: What decision or action can users take?
+
+**EXAMPLES OF GOOD CHART REASONING:**
+✓ "Compare revenue across regions to identify top markets for expansion investment"
+✓ "Track sales trends over time to forecast future demand and set targets"
+✓ "Analyze customer segments to prioritize retention vs acquisition strategies"
+
+**EXAMPLES OF BAD CHART REASONING:**
+✗ "Bar chart shows data by category" (technical description, no business value)
+✗ "Line chart for trends" (generic, doesn't explain WHY)
+✗ "Performance-optimized visualization" (focuses on tech, not insights)
+
+**OUTPUT FORMAT (JSON only, no markdown):**
 {
   "combinations": [
     {
-      "title": "Chart Title",
+      "title": "Revenue Performance by Region",
       "type": "bar",
-      "measures": ["measure1"],
-      "dimensions": ["dimension1"],
-      "aiSuggestion": "Why this chart works well",
-      "reasoning": "Performance consideration",
-      "insights": ["Business insight"],
+      "measures": ["revenue"],
+      "dimensions": ["region"],
+      "businessPurpose": "Identify top-performing markets for expansion investment",
+      "expectedInsight": "Regional revenue concentration and growth opportunities",
+      "actionableFor": "Sales territory planning and resource allocation",
+      "aiSuggestion": "Top 3 regions drive 60% of revenue - diversification opportunity in underperforming markets",
+      "reasoning": "Regional comparison reveals where to invest sales resources",
+      "insights": ["West region shows 2x higher revenue than others - potential best practice to replicate"],
       "isAiGenerated": true
     }
   ]
-}`;
+}
+
+**CRITICAL RULES:**
+- Every chart must answer a specific business question
+- "businessPurpose" must explain WHY this chart matters for decisions
+- "expectedInsight" must describe what pattern/trend it reveals
+- "actionableFor" must specify what action users can take
+- Think: "What would an executive want to know from this chart?"
+
+Return JSON only, no markdown.`;
 
       return prompt;
     }
