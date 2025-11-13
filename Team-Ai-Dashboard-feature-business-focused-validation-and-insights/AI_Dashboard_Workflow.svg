@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="1079pt" height="728pt" viewBox="0.00 0.00 1079.00 728.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 724)">
+<title>AI_Dashboard_Workflow</title>
+<polygon fill="#ffffff" stroke="transparent" points="-4,4 -4,-724 1075,-724 1075,4 -4,4"/>
+<!-- USER -->
+<g id="node1" class="node">
+<title>user</title>
+<polygon fill="#117A65" stroke="#117A65" points="389,-720 245,-720 245,-672 389,-672 389,-720"/>
+<text text-anchor="middle" x="317" y="-703.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">USER</text>
+<text text-anchor="middle" x="317" y="-688.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">(File Upload / Filters)</text>
+</g>
+<!-- FRONTEND -->
+<g id="node2" class="node">
+<title>frontend</title>
+<polygon fill="#2E86C1" stroke="#2E86C1" points="460,-636 174,-636 174,-552 460,-552 460,-636"/>
+<text text-anchor="middle" x="317" y="-619.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">FRONTEND</text>
+<text text-anchor="middle" x="317" y="-604.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">React.js Dashboard</text>
+<text text-anchor="middle" x="317" y="-589.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• File Upload</text>
+<text text-anchor="middle" x="317" y="-574.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Charts / Filters</text>
+<text text-anchor="middle" x="317" y="-559.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• KPIs / Progress UI</text>
+</g>
+<!-- BACKEND -->
+<g id="node3" class="node">
+<title>backend</title>
+<polygon fill="#2E86C1" stroke="#2E86C1" points="504,-504 130,-504 130,-420 504,-420 504,-504"/>
+<text text-anchor="middle" x="317" y="-487.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">BACKEND</text>
+<text text-anchor="middle" x="317" y="-472.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">Node.js + Express</text>
+<text text-anchor="middle" x="317" y="-457.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• File Parser</text>
+<text text-anchor="middle" x="317" y="-442.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Chunk Processing</text>
+<text text-anchor="middle" x="317" y="-427.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• API Routes / Filters</text>
+<text text-anchor="middle" x="317" y="-412.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Calculations</text>
+</g>
+<!-- DATA LAYER -->
+<g id="node4" class="node">
+<title>data</title>
+<polygon fill="#2E86C1" stroke="#2E86C1" points="370,-372 264,-372 264,-288 370,-288 370,-372"/>
+<text text-anchor="middle" x="317" y="-355.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">DATA LAYER</text>
+<text text-anchor="middle" x="317" y="-340.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">In-Memory Store</text>
+<text text-anchor="middle" x="317" y="-325.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Sessions Map</text>
+<text text-anchor="middle" x="317" y="-310.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Raw Data (100k)</text>
+<text text-anchor="middle" x="317" y="-295.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Schema Info</text>
+<text text-anchor="middle" x="317" y="-280.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Temp Storage</text>
+</g>
+<!-- AI LAYER -->
+<g id="node5" class="node">
+<title>ai</title>
+<polygon fill="#2E86C1" stroke="#2E86C1" points="818,-372 518,-372 518,-288 818,-288 818,-372"/>
+<text text-anchor="middle" x="668" y="-355.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">AI LAYER</text>
+<text text-anchor="middle" x="668" y="-340.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">OpenRouter (GPT-3.5)</text>
+<text text-anchor="middle" x="668" y="-325.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Schema + Sample (50r)</text>
+<text text-anchor="middle" x="668" y="-310.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Analysis + Suggestions</text>
+<text text-anchor="middle" x="668" y="-295.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Fallback if AI fails</text>
+</g>
+<!-- REAL-TIME FILTERS -->
+<g id="node6" class="node">
+<title>filters</title>
+<polygon fill="#2E86C1" stroke="#2E86C1" points="432,-240 202,-240 202,-156 432,-156 432,-240"/>
+<text text-anchor="middle" x="317" y="-223.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">REAL-TIME FILTERS</text>
+<text text-anchor="middle" x="317" y="-208.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">Apply on raw data</text>
+<text text-anchor="middle" x="317" y="-193.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Debounce + Validation</text>
+<text text-anchor="middle" x="317" y="-178.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• Return chart data</text>
+<text text-anchor="middle" x="317" y="-163.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">• KPI recalculation</text>
+</g>
+<!-- FRONTEND UPDATE -->
+<g id="node7" class="node">
+<title>frontend_update</title>
+<polygon fill="#117A65" stroke="#117A65" points="422,-108 212,-108 212,-60 422,-60 422,-108"/>
+<text text-anchor="middle" x="317" y="-91.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">FRONTEND UPDATE</text>
+<text text-anchor="middle" x="317" y="-76.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">Smooth chart transitions</text>
+<text text-anchor="middle" x="317" y="-61.8" font-family="Times,serif" font-size="12.00" fill="#ffffff">Update KPIs &amp; dashboards</text>
+</g>
+</g>
+</svg>
