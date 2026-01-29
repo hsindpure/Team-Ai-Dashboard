@@ -1,0 +1,293 @@
+const chatbotService = require('../services/chatbotService');
+
+
+// STEP 2: MODIFY the /upload route (around line 59-140)
+// Replace the existing upload route with this updated version:
+
+if (upload && dataProcessor && dataValidator && helpers) {
+  router.post('/upload', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No file uploaded'
+        });
+      }
+
+      console.log('📁 File uploaded:', req.file.originalname);
+
+      // Step 1: Process file
+      const processedData = await dataProcessor.processFile(req.file);
+      console.log('✅ File processed successfully');
+
+      // Step 2: Validate data
+      console.log('🔍 Running validation...');
+      const validationResult = await dataValidator.validateData(
+        processedData.data,
+        processedData.schema
+      );
+      console.log('✅ Validation complete:', validationResult.overallStatus);
+
+      // Step 3: Generate chatbot suggested questions ⭐ NEW
+      console.log('🤖 Generating chatbot questions...');
+      let chatbotQuestions = [];
+      try {
+        chatbotQuestions = await chatbotService.generateSuggestedQuestions(
+          processedData.schema,
+          validationResult,
+          processedData.sampleData
+        );
+        console.log(`✅ Generated ${chatbotQuestions.length} chatbot questions`);
+      } catch (error) {
+        console.warn('⚠️ Chatbot question generation failed:', error.message);
+        chatbotQuestions = chatbotService.getFallbackQuestions(processedData.schema);
+      }
+
+      // Step 4: Generate session ID and store
+      const sessionId = helpers.generateSessionId();
+      
+      sessions.set(sessionId, {
+        data: processedData.data,
+        schema: processedData.schema,
+        stats: processedData.stats,
+        sampleData: processedData.sampleData,
+        fullDataCount: processedData.data.length,
+        validationResult,
+        uploadedAt: new Date().toISOString(),
+        uploadTime: new Date().toISOString(),
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        customCharts: [],
+        chatbotQuestions, // ⭐ NEW - Store chatbot questions
+        chatHistory: []    // ⭐ NEW - Initialize chat history
+      });
+
+      console.log(`💾 Session created: ${sessionId} (${sessions.size} total sessions)`);
+
+      // Step 5: Create preview
+      const preview = {
+        fileName: req.file.originalname,
+        fileSize: helpers.formatBytes(req.file.size),
+        totalRows: processedData.stats.totalRows,
+        totalColumns: processedData.stats.totalColumns,
+        measures: processedData.schema.measures.length,
+        dimensions: processedData.schema.dimensions.length,
+        validation: {
+          status: validationResult.overallStatus,
+          isReady: validationResult.isReadyForDashboard,
+          issueCount: validationResult.summary.totalIssues
+        }
+      };
+
+      res.json({
+        success: true,
+        sessionId,
+        preview,
+        validationResult,
+        chatbotQuestions // ⭐ NEW - Return questions to frontend
+      });
+
+    } catch (error) {
+      console.error('❌ Upload/validation error:', error);
+      
+      if (req.file && req.file.path) {
+        const fs = require('fs');
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.warn('Could not cleanup file:', cleanupError.message);
+        }
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Upload processing failed'
+      });
+    }
+  });
+} else {
+  router.post('/upload', (req, res) => {
+    res.status(501).json({
+      success: false,
+      message: 'Upload service not available - missing required services'
+    });
+  });
+}
+
+
+//route
+
+
+
+
+// ============================================
+// CHATBOT ROUTES - ADD TO backend/routes/api.js
+// ============================================
+// Add this code AFTER the dashboard-story route (around line 646)
+// Also add this import at the top of the file:
+// const chatbotService = require('../services/chatbotService');
+
+// ============================================
+// GET CHATBOT SUGGESTED QUESTIONS
+// ============================================
+router.get('/chatbot/questions/:sessionId', (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const sessionData = sessions.get(sessionId);
+
+    if (!sessionData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    // Return pre-generated questions from session
+    const questions = sessionData.chatbotQuestions || [];
+
+    res.json({
+      success: true,
+      questions
+    });
+
+  } catch (error) {
+    console.error('❌ Chatbot questions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving chatbot questions'
+    });
+  }
+});
+
+// ============================================
+// POST CHATBOT MESSAGE
+// ============================================
+router.post('/chatbot/message', async (req, res) => {
+  try {
+    const { sessionId, message, conversationHistory = [] } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message is required'
+      });
+    }
+
+    const sessionData = sessions.get(sessionId);
+
+    if (!sessionData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found or expired'
+      });
+    }
+
+    console.log(`💬 Processing chatbot message for session: ${sessionId}`);
+
+    // Process message with chatbot service
+    const response = await chatbotService.processMessage(
+      message,
+      sessionData,
+      conversationHistory
+    );
+
+    // Store conversation in session
+    if (!sessionData.chatHistory) {
+      sessionData.chatHistory = [];
+    }
+    
+    sessionData.chatHistory.push({
+      role: 'user',
+      content: message,
+      timestamp: new Date().toISOString()
+    });
+    
+    sessionData.chatHistory.push({
+      role: 'assistant',
+      content: response.content,
+      type: response.type,
+      timestamp: new Date().toISOString()
+    });
+
+    sessions.set(sessionId, sessionData);
+
+    res.json({
+      success: true,
+      response
+    });
+
+  } catch (error) {
+    console.error('❌ Chatbot message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing message: ' + error.message,
+      response: {
+        type: 'text',
+        content: "I'm sorry, I encountered an error. Please try rephrasing your question."
+      }
+    });
+  }
+});
+
+// ============================================
+// GET CHATBOT CONVERSATION HISTORY
+// ============================================
+router.get('/chatbot/history/:sessionId', (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const sessionData = sessions.get(sessionId);
+
+    if (!sessionData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    const history = sessionData.chatHistory || [];
+
+    res.json({
+      success: true,
+      history
+    });
+
+  } catch (error) {
+    console.error('❌ Chatbot history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving chat history'
+    });
+  }
+});
+
+// ============================================
+// CLEAR CHATBOT CONVERSATION
+// ============================================
+router.delete('/chatbot/history/:sessionId', (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const sessionData = sessions.get(sessionId);
+
+    if (!sessionData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    sessionData.chatHistory = [];
+    sessions.set(sessionId, sessionData);
+
+    res.json({
+      success: true,
+      message: 'Chat history cleared'
+    });
+
+  } catch (error) {
+    console.error('❌ Clear history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error clearing chat history'
+    });
+  }
+});
