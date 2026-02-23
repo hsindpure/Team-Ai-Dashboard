@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Brief — Client Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:         #FAF8F5;
+    --bg-warm:    #F5F1EB;
+    --surface:    #FFFFFF;
+    --border:     #E8E0D4;
+    --border-hov: #C9A96E;
+    --amber:      #C17D2E;
+    --amber-l:    #E8A444;
+    --amber-bg:   #FEF3E2;
+    --amber-bdr:  #F0C785;
+    --blue:       #3B6FD4;
+    --blue-bg:    #EEF2FB;
+    --green:      #2A8A5C;
+    --green-bg:   #EDFAF4;
+    --red:        #C0392B;
+    --red-bg:     #FEF0EE;
+    --text:       #1C1712;
+    --text-mid:   #4A3F35;
+    --text-soft:  #7A6E64;
+    --text-muted: #A89E94;
+  }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input  { font-family: inherit; }
+  select { font-family: inherit; }
+
+  /* Nav */
+  .nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .nav-left  { display: flex; align-items: center; gap: 12px; }
+  .nav-logo  { width: 34px; height: 34px; background: var(--amber); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .nav-logo span { color: #fff; font-size: 16px; font-weight: 700; font-family: 'Lora', serif; }
+  .nav-title { color: var(--text); font-weight: 600; font-size: 15px; }
+  .nav-sep   { color: var(--border); font-size: 20px; }
+  .nav-sub   { color: var(--text-soft); font-size: 13px; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-label { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .export-badge { font-size: 11.5px; color: var(--green); background: var(--green-bg); padding: 4px 10px; border-radius: 6px; font-weight: 600; display: none; }
+  .client-select { font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 6px 12px; }
+
+  /* Main */
+  .main { max-width: 960px; margin: 0 auto; padding: 36px 24px; }
+
+  /* Animations */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fadeUp 0.25s ease; }
+
+  /* Client home */
+  .client-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; margin-bottom: 32px; border-bottom: 1px solid var(--border); }
+  .client-label  { font-size: 11px; color: var(--amber); letter-spacing: 1.5px; margin-bottom: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .client-name   { font-size: 30px; font-weight: 700; color: var(--text); font-family: 'Lora', serif; letter-spacing: -0.5px; line-height: 1.2; }
+  .client-meta   { font-size: 13px; color: var(--text-soft); margin-top: 8px; }
+  .meeting-card  { background: var(--amber-bg); border: 1px solid var(--amber-bdr); border-radius: 10px; padding: 14px 20px; text-align: right; }
+  .meeting-label { font-size: 10.5px; color: var(--text-muted); letter-spacing: 0.8px; margin-bottom: 5px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .meeting-date  { font-size: 17px; color: var(--amber); font-weight: 700; font-family: 'Lora', serif; }
+  .meeting-with  { font-size: 12px; color: var(--text-soft); margin-top: 4px; }
+
+  .section-label { font-size: 10.5px; color: var(--text-muted); letter-spacing: 0.8px; margin-bottom: 16px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+
+  /* Story grid */
+  .story-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .story-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px 20px; cursor: pointer; transition: all 0.15s; position: relative;
+  }
+  .story-card:hover { border-color: var(--border-hov); box-shadow: 0 4px 16px rgba(193,125,46,0.1); }
+  .story-card.no-data { opacity: 0.4; cursor: default; pointer-events: none; }
+  .story-icon  { font-size: 24px; margin-bottom: 12px; }
+  .story-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; font-family: 'Lora', serif; }
+  .story-desc  { font-size: 12.5px; color: var(--text-soft); line-height: 1.55; }
+  .story-cta   { position: absolute; bottom: 16px; right: 18px; font-size: 12px; color: var(--amber); font-weight: 600; }
+  .story-nd    { position: absolute; bottom: 16px; right: 18px; font-size: 11px; color: var(--text-muted); }
+
+  /* Brief view */
+  .breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; font-size: 12px; color: var(--text-muted); }
+  .breadcrumb-back { color: var(--amber); background: none; border: none; font-size: 12px; padding: 0; font-family: inherit; }
+  .breadcrumb-current { color: var(--text-mid); font-weight: 500; }
+
+  .brief-header { margin-bottom: 26px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .brief-story-label { font-size: 11px; color: var(--amber); letter-spacing: 1.5px; margin-bottom: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .brief-headline { font-size: 21px; font-weight: 700; color: var(--text); font-family: 'Lora', serif; line-height: 1.45; max-width: 680px; }
+
+  /* Metric tiles */
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 12px; margin-bottom: 26px; }
+  .metric-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; position: relative; overflow: hidden; }
+  .metric-bar  { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 10px 10px 0 0; opacity: 0.5; }
+  .metric-label { font-size: 10.5px; color: var(--text-muted); letter-spacing: 0.8px; margin-bottom: 8px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .metric-value { font-size: 26px; font-weight: 700; color: var(--text); font-family: 'Lora', serif; letter-spacing: -0.5px; line-height: 1; }
+  .metric-delta { margin-top: 8px; font-size: 11.5px; font-weight: 600; display: inline-block; padding: 2px 7px; border-radius: 4px; }
+  .metric-bench { margin-top: 7px; font-size: 11px; color: var(--text-muted); }
+  .metric-bench span { color: var(--text-soft); font-weight: 500; }
+
+  /* Content row */
+  .content-row { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-label { font-size: 10.5px; color: var(--text-muted); letter-spacing: 0.8px; margin-bottom: 12px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+  .card-text  { font-size: 13px; color: var(--text-soft); line-height: 1.75; }
+  .card-amber { background: var(--amber-bg); border-color: var(--amber-bdr); }
+  .card-amber .card-label { color: var(--amber); }
+  .card-amber .card-text  { color: var(--text-mid); font-weight: 500; }
+  .insight-col { display: flex; flex-direction: column; gap: 12px; }
+
+  /* Chart */
+  svg.trend { width: 100%; height: 110px; }
+  .chart-legend { display: flex; gap: 18px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
+  .legend-line { width: 18px; height: 2.5px; background: var(--amber); border-radius: 2px; }
+  .legend-dash { width: 18px; border-top: 2px dashed var(--border); }
+
+  /* Talking points */
+  .talking-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px; margin-bottom: 20px; }
+  .talking-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .talking-count  { font-size: 11.5px; color: var(--text-muted); }
+  .talking-count.has-selected { color: var(--amber); font-weight: 600; }
+
+  .tp-row {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.15s; margin-bottom: 6px;
+  }
+  .tp-row:hover { background: var(--bg-warm); }
+  .tp-row.selected { background: var(--amber-bg); border-color: var(--amber-bdr); }
+  .tp-check {
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+    border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .tp-check.checked { background: var(--amber); border-color: var(--amber); }
+  .tp-check.checked::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
+  .tp-text { font-size: 13.5px; color: var(--text-soft); line-height: 1.65; }
+  .tp-row.selected .tp-text { color: var(--text-mid); }
+
+  .add-note-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .add-note-row { display: flex; gap: 8px; margin-top: 8px; }
+  .add-note-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+    padding: 9px 13px; font-size: 13px; color: var(--text); outline: none;
+  }
+  .add-note-input:focus { border-color: var(--amber); }
+  .add-note-input::placeholder { color: var(--text-muted); }
+  .btn-add {
+    padding: 9px 18px; background: var(--amber); color: #fff; border: none;
+    border-radius: 7px; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background 0.2s;
+  }
+  .btn-add.added { background: var(--green); }
+
+  /* Actions */
+  .action-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+  .btn-back {
+    padding: 10px 20px; background: none; border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text-soft); font-size: 13px;
+  }
+  .btn-export {
+    padding: 10px 26px; background: var(--amber); color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; transition: background 0.2s;
+  }
+  .btn-export.done { background: var(--green); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 680px) {
+    .content-row { grid-template-columns: 1fr; }
+    .client-header { flex-direction: column; gap: 16px; }
+    .metric-grid { grid-template-columns: 1fr 1fr; }
+    .nav { padding: 0 16px; }
+    .main { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-left">
+    <div class="nav-logo"><span>B</span></div>
+    <span class="nav-title">Brief</span>
+    <span class="nav-sep">|</span>
+    <span class="nav-sub">Client Intelligence</span>
+  </div>
+  <div class="nav-right">
+    <div class="export-badge" id="exportBadge">✓ <span id="exportCount">0</span> exported</div>
+    <span class="nav-label">Client</span>
+    <select class="client-select" id="clientSelect" onchange="onClientChange()">
+      <option value="0">Meridian Manufacturing</option>
+      <option value="1">Crestview Health Systems</option>
+      <option value="2">Hartwell Financial Group</option>
+    </select>
+  </div>
+</nav>
+
+<main class="main" id="main"></main>
+
+<script>
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const CLIENTS = [
+  { name: "Meridian Manufacturing",   industry: "Manufacturing",      members: 4820,  meetingDate: "Mar 4, 2026",  manager: "Sarah Chen" },
+  { name: "Crestview Health Systems", industry: "Healthcare",         members: 12340, meetingDate: "Mar 11, 2026", manager: "James Okafor" },
+  { name: "Hartwell Financial Group", industry: "Financial Services", members: 2190,  meetingDate: "Mar 18, 2026", manager: "Sarah Chen" },
+];
+
+const TEMPLATES = [
+  { id: "cost_trend",  icon: "📈", label: "Cost Trend",          desc: "How costs moved vs prior year and benchmark" },
+  { id: "rx_story",    icon: "💊", label: "Rx Opportunity",      desc: "Generic conversion and specialty exposure" },
+  { id: "high_cost",   icon: "🔴", label: "High-Cost Claimants", desc: "Top cost drivers and impact on total spend" },
+  { id: "utilization", icon: "🏥", label: "Utilization Shifts",  desc: "ER, inpatient, and preventive care patterns" },
+  { id: "plan_perf",   icon: "⚖️",  label: "Plan Performance",   desc: "HDHP vs PPO enrollment, OOP, and engagement" },
+];
+
+const NARRATIVES = {
+  cost_trend: {
+    headline: "Total costs rose 8.4% year-over-year, outpacing the industry benchmark by 2.1 points.",
+    insight: "The primary driver is specialty Rx spend, which grew 22% and now represents 31% of total pharmacy costs — up from 24% last year. Medical unit cost increases were modest at 3.1%, indicating the cost pressure is concentrated in the drug benefit.",
+    so_what: "Without intervention, specialty Rx is on pace to add $420K in incremental cost in 2026. A specialty drug management program or step-therapy protocol for the top 5 agents could recover 40–60% of that.",
+    metrics: [
+      { label: "Total PMPM",         value: "$487",   delta: "↑ +8.4%",                   dir: "bad",     bench: "$461",   benchLabel: "Industry" },
+      { label: "Medical PMPM",       value: "$352",   delta: "↑ +3.8%",                   dir: "neutral", bench: "$344",   benchLabel: "Industry" },
+      { label: "Rx PMPM",            value: "$135",   delta: "↑ +18.2%",                  dir: "bad",     bench: "$117",   benchLabel: "Industry" },
+      { label: "Trend vs Benchmark", value: "+2.1pp", delta: "Gap widened from 0.8pp",     dir: "bad",     bench: "0.0pp", benchLabel: "Target" },
+    ],
+    tps: [
+      "Costs are rising faster than peers — the benchmark gap widened from 0.8 points last year to 2.1 points.",
+      "Specialty Rx is the story this year, not medical utilization — this is a drug benefit conversation.",
+      "We have a clear intervention path with estimated savings. This isn't just a 'costs are going up' conversation.",
+    ],
+    chart: { labels: ["Q1 '23","Q2 '23","Q3 '23","Q4 '23","Q1 '24","Q2 '24","Q3 '24","Q4 '24"], values: [421,438,429,445,452,468,459,487], bench: [415,420,418,425,435,441,438,455] },
+  },
+  rx_story: {
+    headline: "Generic dispensing rate is 74% — 8 points below the achievable benchmark of 82%.",
+    insight: "Brand drugs with available generic equivalents account for $1.2M in annual spend. The top 3 brand-to-generic conversion opportunities — Eliquis, Jardiance, and an Ozempic biosimilar — represent $640K. Mail-order utilization is also low at 18% of maintenance fills vs a 35% benchmark.",
+    so_what: "A targeted member outreach program and PBM formulary adjustment on the top conversion opportunities could yield $380–520K in annual savings. Mail-order expansion alone typically delivers $80–120 PMPM reduction on maintenance drugs.",
+    metrics: [
+      { label: "Generic Rate",      value: "74%",   delta: "↓ -8pp vs benchmark",   dir: "bad",     bench: "82%", benchLabel: "Achievable" },
+      { label: "Specialty % of Rx", value: "31%",   delta: "↑ +7pp YoY",             dir: "bad",     bench: "24%", benchLabel: "Last Year" },
+      { label: "Mail Order Rate",   value: "18%",   delta: "↓ -17pp vs benchmark",  dir: "bad",     bench: "35%", benchLabel: "Benchmark" },
+      { label: "Conversion Opp.",   value: "$640K", delta: "Top 3 drugs",            dir: "neutral", bench: "",    benchLabel: "" },
+    ],
+    tps: [
+      "You're leaving meaningful money on the table in the drug benefit — and the fix is well-understood.",
+      "This isn't about restricting access — it's directing members to equivalent, lower-cost options.",
+      "We can size the savings with precision and model the member impact before any change is made.",
+    ],
+    chart: { labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], values: [71,72,71,73,72,74,73,75,74,74,75,74], bench: [80,80,81,81,82,82,82,82,82,82,82,82] },
+  },
+  high_cost: {
+    headline: "18 members drove 34% of total medical spend in 2024 — a concentration ratio above industry norms.",
+    insight: "The top cost tier (claims >$100K) included 4 new entrants this year, 2 of whom had no prior utilization. Oncology (3 members), NICU (2 members), and musculoskeletal (4 members) account for the majority. Stop-loss attachment was triggered for 3 members, recovering $1.1M.",
+    so_what: "Predictive identification of rising-risk members before they become high-cost is the opportunity. Two new high-cost members had prior ER utilization patterns that are strong predictive signals. A care management program targeting the $25–100K spend band could flatten the curve.",
+    metrics: [
+      { label: "Members >$100K",      value: "18",    delta: "↑ +4 vs 2023",         dir: "bad",     bench: "12",  benchLabel: "2023" },
+      { label: "Top Tier % of Spend", value: "34%",   delta: "↑ +6pp YoY",           dir: "bad",     bench: "28%", benchLabel: "Last Year" },
+      { label: "Stop-Loss Recovery",  value: "$1.1M", delta: "3 members triggered",  dir: "neutral", bench: "",    benchLabel: "" },
+      { label: "Rising Risk Members", value: "41",    delta: "$25–100K spend band",  dir: "neutral", bench: "",    benchLabel: "" },
+    ],
+    tps: [
+      "High-cost concentration is up — this is the number your CFO will ask about.",
+      "Stop-loss is doing its job, but upstream prevention is the long-term lever.",
+      "We can identify the 41 rising-risk members and engage them now, before they cross the threshold.",
+    ],
+    chart: { labels: ["2020","2021","2022","2023","2024"], values: [22,19,24,14,34], bench: [26,25,27,28,28] },
+  },
+};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let state = { clientIdx: 0, storyId: null, selectedTPs: {}, exportCount: 0 };
+
+// ─── SVG Chart ────────────────────────────────────────────────────────────────
+function buildChart(data, bench, labels) {
+  const W = 440, H = 110, PX = 8, PY = 14;
+  const all = [...data, ...(bench || [])];
+  const mn = Math.min(...all) * 0.95, mx = Math.max(...all) * 1.05;
+  const range = mx - mn || 1;
+  const px = i => PX + (i / (data.length - 1)) * (W - PX * 2);
+  const py = v => H - PY - ((v - mn) / range) * (H - PY * 2);
+  const dPts = data.map((v,i) => `${px(i)},${py(v)}`).join(' ');
+  const bPts = bench ? bench.map((v,i) => `${px(i)},${py(v)}`).join(' ') : '';
+  const area = `${PX},${H-PY} ${dPts} ${W-PX},${H-PY}`;
+  const step = Math.ceil(labels.length / 5);
+  const labelTags = labels.map((l,i) => i % step === 0
+    ? `<text x="${px(i)}" y="${H}" text-anchor="middle" font-size="9.5" fill="#A89E94" font-family="DM Mono,monospace">${l}</text>`
+    : '').join('');
+  const dots = data.map((v,i) =>
+    `<circle cx="${px(i)}" cy="${py(v)}" r="3.5" fill="white" stroke="#C17D2E" stroke-width="2"/>`).join('');
+  return `
+    <svg viewBox="0 0 ${W} ${H}" class="trend" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#C17D2E" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#C17D2E" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon points="${area}" fill="url(#wg)"/>
+      ${bPts ? `<polyline points="${bPts}" fill="none" stroke="#E8E0D4" stroke-width="1.5" stroke-dasharray="5 3"/>` : ''}
+      <polyline points="${dPts}" fill="none" stroke="#C17D2E" stroke-width="2.5" stroke-linejoin="round"/>
+      ${dots}
+      ${labelTags}
+    </svg>`;
+}
+
+// ─── Color helpers ────────────────────────────────────────────────────────────
+function dirColor(dir) {
+  return dir === 'bad' ? '#C0392B' : dir === 'good' ? '#2A8A5C' : '#C17D2E';
+}
+function dirBg(dir) {
+  return dir === 'bad' ? '#FEF0EE' : dir === 'good' ? '#EDFAF4' : '#FEF3E2';
+}
+
+// ─── Render: Client Home ──────────────────────────────────────────────────────
+function renderHome() {
+  const c = CLIENTS[state.clientIdx];
+  const cards = TEMPLATES.map(t => {
+    const has = !!NARRATIVES[t.id];
+    return `
+      <div class="story-card${has ? '' : ' no-data'}" onclick="${has ? `selectStory('${t.id}')` : ''}">
+        <div class="story-icon">${t.icon}</div>
+        <div class="story-title">${t.label}</div>
+        <div class="story-desc">${t.desc}</div>
+        ${has ? `<div class="story-cta">Build →</div>` : `<div class="story-nd">No data</div>`}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="fade-up">
+      <div class="client-header">
+        <div>
+          <div class="client-label">Client Brief</div>
+          <div class="client-name">${c.name}</div>
+          <div class="client-meta">${c.members.toLocaleString()} members · ${c.industry}</div>
+        </div>
+        <div class="meeting-card">
+          <div class="meeting-label">Next Meeting</div>
+          <div class="meeting-date">${c.meetingDate}</div>
+          <div class="meeting-with">with ${c.manager}</div>
+        </div>
+      </div>
+      <div class="section-label">Choose a Story to Build</div>
+      <div class="story-grid">${cards}</div>
+    </div>`;
+}
+
+// ─── Render: Brief View ───────────────────────────────────────────────────────
+function renderBrief() {
+  const c = CLIENTS[state.clientIdx];
+  const n = NARRATIVES[state.storyId];
+  const t = TEMPLATES.find(x => x.id === state.storyId);
+
+  // Metrics
+  const metricTiles = n.metrics.map(m => {
+    const col = dirColor(m.dir), bg = dirBg(m.dir);
+    return `
+      <div class="metric-tile">
+        <div class="metric-bar" style="background:${col}"></div>
+        <div class="metric-label">${m.label}</div>
+        <div class="metric-value">${m.value}</div>
+        ${m.delta ? `<div class="metric-delta" style="color:${col};background:${bg}">${m.delta}</div>` : ''}
+        ${m.bench ? `<div class="metric-bench">${m.benchLabel}: <span>${m.bench}</span></div>` : ''}
+      </div>`;
+  }).join('');
+
+  // Talking points
+  const tpRows = n.tps.map((pt, i) => {
+    const sel = !!state.selectedTPs[i];
+    return `
+      <div class="tp-row${sel ? ' selected' : ''}" onclick="toggleTP(${i})">
+        <div class="tp-check${sel ? ' checked' : ''}"></div>
+        <div class="tp-text">${pt}</div>
+      </div>`;
+  }).join('');
+
+  const selCount = Object.values(state.selectedTPs).filter(Boolean).length;
+
+  return `
+    <div class="fade-up">
+      <div class="breadcrumb">
+        <button class="breadcrumb-back" onclick="goHome()">← Client Prep</button>
+        <span>/</span><span>${c.name}</span><span>/</span>
+        <span class="breadcrumb-current">${t.label}</span>
+      </div>
+
+      <div class="brief-header">
+        <div class="brief-story-label">${t.icon} ${t.label} · ${c.name}</div>
+        <div class="brief-headline">"${n.headline}"</div>
+      </div>
+
+      <div class="metric-grid">${metricTiles}</div>
+
+      <div class="content-row">
+        <div class="card">
+          <div class="card-label">Trend</div>
+          ${buildChart(n.chart.values, n.chart.bench, n.chart.labels)}
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-line"></div> Client</div>
+            ${n.chart.bench ? `<div class="legend-item"><div class="legend-dash"></div> Benchmark</div>` : ''}
+          </div>
+        </div>
+        <div class="insight-col">
+          <div class="card" style="flex:1">
+            <div class="card-label">What's Driving It</div>
+            <div class="card-text">${n.insight}</div>
+          </div>
+          <div class="card card-amber">
+            <div class="card-label">So What / Action</div>
+            <div class="card-text">${n.so_what}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="talking-card">
+        <div class="talking-header">
+          <div class="section-label" style="margin:0">Talking Points</div>
+          <div class="talking-count${selCount > 0 ? ' has-selected' : ''}" id="tpCount">
+            ${selCount > 0 ? selCount + ' selected for export' : 'Click to select'}
+          </div>
+        </div>
+        <div id="tpList">${tpRows}</div>
+        <div class="add-note-section">
+          <div class="section-label" style="margin:0 0 8px">Add Your Own</div>
+          <div class="add-note-row">
+            <input class="add-note-input" id="customNote" placeholder="Add a talking point specific to this client..." onkeydown="if(event.key==='Enter')addNote()" />
+            <button class="btn-add" id="addBtn" onclick="addNote()">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-back" onclick="goHome()">← Back</button>
+        <button class="btn-export" id="exportBtn" onclick="doExport()">Export to PowerPoint →</button>
+      </div>
+    </div>`;
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+function render() {
+  document.getElementById('main').innerHTML =
+    state.storyId ? renderBrief() : renderHome();
+}
+
+function onClientChange() {
+  state.clientIdx = parseInt(document.getElementById('clientSelect').value);
+  state.storyId = null;
+  state.selectedTPs = {};
+  render();
+}
+
+function selectStory(id) {
+  state.storyId = id;
+  state.selectedTPs = {};
+  render();
+}
+
+function goHome() {
+  state.storyId = null;
+  state.selectedTPs = {};
+  render();
+}
+
+function toggleTP(i) {
+  state.selectedTPs[i] = !state.selectedTPs[i];
+  // Re-render only TP list and count
+  const n = NARRATIVES[state.storyId];
+  const tpRows = n.tps.map((pt, idx) => {
+    const sel = !!state.selectedTPs[idx];
+    return `
+      <div class="tp-row${sel ? ' selected' : ''}" onclick="toggleTP(${idx})">
+        <div class="tp-check${sel ? ' checked' : ''}"></div>
+        <div class="tp-text">${pt}</div>
+      </div>`;
+  }).join('');
+  document.getElementById('tpList').innerHTML = tpRows;
+  const selCount = Object.values(state.selectedTPs).filter(Boolean).length;
+  const el = document.getElementById('tpCount');
+  el.textContent = selCount > 0 ? selCount + ' selected for export' : 'Click to select';
+  el.className = 'talking-count' + (selCount > 0 ? ' has-selected' : '');
+}
+
+function addNote() {
+  const inp = document.getElementById('customNote');
+  const btn = document.getElementById('addBtn');
+  if (!inp.value.trim()) return;
+  inp.value = '';
+  btn.textContent = '✓ Added';
+  btn.classList.add('added');
+  setTimeout(() => { btn.textContent = 'Add'; btn.classList.remove('added'); }, 2000);
+}
+
+function doExport() {
+  const btn = document.getElementById('exportBtn');
+  btn.textContent = '✓ Exported to PowerPoint';
+  btn.classList.add('done');
+  state.exportCount++;
+  const badge = document.getElementById('exportBadge');
+  document.getElementById('exportCount').textContent = state.exportCount;
+  badge.style.display = 'block';
+  setTimeout(() => { btn.textContent = 'Export to PowerPoint →'; btn.classList.remove('done'); }, 2500);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
