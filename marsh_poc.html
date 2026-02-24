@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marsh — Claims Analytics Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════
+   RESET & VARIABLES
+═══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #060d1a;
+  --bg2:       #081526;
+  --bg3:       #0d1e35;
+  --bg4:       #112240;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --blue:      #00a4e4;
+  --blue-dark: #0077cc;
+  --blue-dim:  rgba(0,164,228,0.12);
+  --indigo:    #6366f1;
+  --green:     #10b981;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --purple:    #8b5cf6;
+  --text:      rgba(255,255,255,0.88);
+  --text2:     rgba(255,255,255,0.55);
+  --text3:     rgba(255,255,255,0.28);
+  --font-head: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --radius:    12px;
+  --shadow:    0 8px 32px rgba(0,0,0,0.4);
+}
+html, body { height: 100%; font-family: var(--font-body); background: var(--bg); color: var(--text); font-size: 14px; overflow: hidden; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+button { cursor: pointer; font-family: var(--font-body); }
+
+/* ═══════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════ */
+@keyframes fadeIn   { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+@keyframes spin     { to{transform:rotate(360deg)} }
+@keyframes pulse    { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.1)} }
+@keyframes slidein  { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:none} }
+@keyframes countUp  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.fade-in { animation: fadeIn .45s ease both; }
+.fade-in-delay { animation: fadeIn .45s ease .15s both; }
+
+/* ═══════════════════════════════════════════════
+   LAYOUT SHELL
+═══════════════════════════════════════════════ */
+#app { display:flex; height:100vh; overflow:hidden; }
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════ */
+#sidebar {
+  width: 220px; min-width:220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: width .25s ease; overflow:hidden;
+}
+#sidebar.collapsed { width: 64px; min-width:64px; }
+
+.sidebar-logo {
+  display:flex; align-items:center; gap:12px;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-box {
+  width:36px; height:36px; flex-shrink:0;
+  background: linear-gradient(135deg,#00a4e4,#0055aa);
+  border-radius:9px; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-head); font-weight:800; font-size:18px; color:#fff;
+  box-shadow:0 4px 14px rgba(0,164,228,.35);
+}
+.logo-text { overflow:hidden; white-space:nowrap; transition:opacity .2s; }
+.logo-text .brand { font-family:var(--font-head); font-weight:700; font-size:15px; letter-spacing:3px; color:#fff; }
+.logo-text .tagline { font-size:10px; color:var(--text3); margin-top:2px; }
+#sidebar.collapsed .logo-text { opacity:0; width:0; }
+
+.sidebar-nav { padding:12px 8px; display:flex; flex-direction:column; gap:3px; }
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 10px; border-radius:10px;
+  border:none; background:transparent; color:var(--text2);
+  font-size:13px; font-weight:500; width:100%; text-align:left;
+  transition:all .15s; white-space:nowrap; overflow:hidden;
+  position:relative;
+}
+.nav-item:hover { background:rgba(255,255,255,.05); color:var(--text); }
+.nav-item.active { background:var(--blue-dim); color:#fff; font-weight:600; }
+.nav-item.active::before {
+  content:''; position:absolute; left:0; top:18%; bottom:18%;
+  width:3px; background:var(--blue); border-radius:0 2px 2px 0;
+}
+.nav-icon { font-size:17px; flex-shrink:0; width:20px; text-align:center; }
+.nav-label { transition:opacity .2s,width .2s; overflow:hidden; }
+#sidebar.collapsed .nav-label { opacity:0; width:0; }
+
+.sidebar-spacer { flex:1; }
+.sidebar-user {
+  padding:8px; border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; overflow:hidden;
+}
+.user-avatar {
+  width:32px; height:32px; flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  border-radius:8px; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; color:#fff;
+}
+.user-info { overflow:hidden; white-space:nowrap; transition:opacity .2s; }
+.user-info .uname { font-size:12px; font-weight:600; color:var(--text); }
+.user-info .urole { font-size:10px; color:var(--text3); margin-top:1px; }
+#sidebar.collapsed .user-info { opacity:0; width:0; }
+.sidebar-toggle {
+  width:28px; height:28px; flex-shrink:0; margin-left:auto;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  border-radius:6px; display:flex; align-items:center; justify-content:center;
+  font-size:10px; color:var(--text3); transition:transform .25s;
+}
+#sidebar.collapsed .sidebar-toggle { transform:rotate(180deg); }
+
+/* ═══════════════════════════════════════════════
+   MAIN AREA
+═══════════════════════════════════════════════ */
+#main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* TOPBAR */
+#topbar {
+  height:56px; flex-shrink:0;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 28px; background:var(--bg2);
+}
+.breadcrumb { display:flex; align-items:center; gap:8px; font-size:13px; }
+.bc-home { color:var(--text3); }
+.bc-sep  { color:var(--text3); }
+.bc-curr { color:var(--text2); font-weight:500; }
+.topbar-right { display:flex; align-items:center; gap:14px; }
+.notif-btn {
+  position:relative; background:rgba(255,255,255,.04);
+  border:1px solid var(--border); border-radius:8px;
+  padding:7px 10px; color:var(--text);
+}
+.notif-dot {
+  position:absolute; top:6px; right:7px;
+  width:7px; height:7px; background:var(--red);
+  border-radius:50%; border:1.5px solid var(--bg2);
+}
+.divider-v { width:1px; height:26px; background:var(--border2); }
+.top-user { display:flex; align-items:center; gap:10px; }
+.top-avatar {
+  width:32px; height:32px;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  border-radius:8px; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; color:#fff;
+}
+.top-uname { font-size:13px; font-weight:600; color:var(--text); }
+.top-urole { font-size:11px; color:var(--text3); }
+.signout-btn {
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  border-radius:8px; padding:6px 14px;
+  color:var(--text2); font-size:12px; transition:all .15s;
+}
+.signout-btn:hover { background:rgba(255,255,255,.08); color:var(--text); }
+
+/* CONTENT AREA */
+#content { flex:1; overflow-y:auto; padding:28px; }
+
+/* ═══════════════════════════════════════════════
+   PAGES
+═══════════════════════════════════════════════ */
+.page { display:none; }
+.page.active { display:block; animation:fadeIn .35s ease; }
+
+/* ═══════════════════════════════════════════════
+   LOGIN PAGE
+═══════════════════════════════════════════════ */
+#login-page {
+  position:fixed; inset:0; z-index:1000;
+  background:#060d1a;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-body);
+}
+.login-bg { position:absolute; inset:0; overflow:hidden; }
+.bg-grid {
+  position:absolute; inset:0;
+  background-image:linear-gradient(rgba(0,164,228,.04) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,164,228,.04) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+.bg-blob1 {
+  position:absolute; top:-100px; right:-80px;
+  width:500px; height:500px;
+  background:radial-gradient(circle,rgba(0,164,228,.13) 0%,transparent 70%);
+  animation:pulse 6s ease-in-out infinite;
+}
+.bg-blob2 {
+  position:absolute; bottom:-80px; left:-60px;
+  width:420px; height:420px;
+  background:radial-gradient(circle,rgba(99,102,241,.1) 0%,transparent 70%);
+  animation:pulse 8s ease-in-out infinite reverse;
+}
+.login-card {
+  position:relative; z-index:1;
+  width:430px; padding:48px 44px 40px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:20px; backdrop-filter:blur(16px);
+  box-shadow:0 32px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  animation:fadeIn .6s ease;
+}
+.login-accent {
+  position:absolute; top:0; left:40px; right:40px; height:2px;
+  background:linear-gradient(90deg,transparent,#00a4e4,#6366f1,transparent);
+  border-radius:0 0 2px 2px;
+}
+.login-logo-row { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+.login-logo-box {
+  width:44px; height:44px;
+  background:linear-gradient(135deg,#00a4e4,#0066cc);
+  border-radius:10px; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-head); font-weight:800; font-size:22px; color:#fff;
+  box-shadow:0 4px 16px rgba(0,164,228,.3);
+}
+.login-brand { font-family:var(--font-head); font-weight:700; font-size:18px; letter-spacing:3px; color:#fff; }
+.login-subbrand { font-size:11px; color:var(--text3); margin-top:2px; }
+.login-divider { height:1px; background:rgba(255,255,255,.07); margin-bottom:28px; }
+.login-title { font-family:var(--font-head); font-weight:700; font-size:22px; color:#fff; margin-bottom:10px; letter-spacing:-.5px; }
+.login-sub { color:var(--text3); font-size:13.5px; line-height:1.6; margin-bottom:32px; }
+.sso-btn {
+  width:100%; padding:14px; border:none; border-radius:12px;
+  background:linear-gradient(135deg,#00a4e4,#0077cc);
+  color:#fff; font-size:15px; font-weight:600; letter-spacing:.3px;
+  box-shadow:0 4px 16px rgba(0,164,228,.22);
+  transition:all .25s; margin-bottom:20px;
+}
+.sso-btn:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,164,228,.38); }
+.sso-btn:active { transform:none; }
+.sso-btn-inner { display:flex; align-items:center; justify-content:center; gap:10px; }
+.btn-spinner { display:none; width:18px; height:18px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .75s linear infinite; }
+.login-info {
+  display:flex; gap:12px; align-items:flex-start;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  border-radius:10px; padding:14px 16px; margin-bottom:20px;
+}
+.login-info .info-icon { font-size:17px; flex-shrink:0; margin-top:1px; }
+.info-title { color:rgba(255,255,255,.65); font-size:13px; font-weight:600; margin-bottom:3px; }
+.info-desc  { color:var(--text3); font-size:12px; }
+.poc-badge-row { display:flex; align-items:center; justify-content:center; gap:8px; }
+.poc-badge { background:rgba(251,191,36,.12); color:#fbbf24; border:1px solid rgba(251,191,36,.28); border-radius:4px; padding:2px 8px; font-size:10px; font-weight:700; letter-spacing:1px; }
+.poc-hint { color:var(--text3); font-size:12px; }
+
+/* ═══════════════════════════════════════════════
+   SHARED COMPONENTS
+═══════════════════════════════════════════════ */
+.page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+.page-title { font-family:var(--font-head); font-weight:700; font-size:26px; letter-spacing:-.5px; color:#fff; }
+.page-sub   { color:var(--text3); font-size:13px; margin-top:4px; }
+.live-badge { display:flex; align-items:center; gap:6px; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); border-radius:20px; padding:5px 12px; }
+.live-dot   { width:7px; height:7px; background:var(--green); border-radius:50%; animation:pulse 2s infinite; }
+.live-txt   { color:var(--green); font-size:12px; font-weight:600; }
+
+.card { background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+
+/* Summary strip */
+.summary-strip { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+.sum-card { background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.sum-icon  { font-size:16px; }
+.sum-value { font-family:var(--font-head); font-weight:700; font-size:28px; line-height:1; }
+.sum-label { color:var(--text3); font-size:11px; text-align:center; letter-spacing:.3px; }
+
+/* Filter bar */
+.filter-bar { display:flex; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+.search-box { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.04); border:1px solid var(--border2); border-radius:8px; padding:7px 12px; flex:0 0 220px; }
+.search-box input { background:transparent; border:none; outline:none; color:#fff; font-size:13px; font-family:var(--font-body); width:100%; }
+.search-box input::placeholder { color:var(--text3); }
+.sel {
+  background:rgba(255,255,255,.04); border:1px solid var(--border2);
+  border-radius:8px; padding:7px 12px;
+  color:var(--text2); font-size:12px; outline:none;
+  font-family:var(--font-body); cursor:pointer;
+}
+.sel option { background:#0d1e35; }
+.result-count { color:var(--text3); font-size:12px; margin-left:auto; }
+
+/* Grid of client cards */
+#client-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(295px,1fr)); gap:16px; }
+.client-card {
+  border-radius:14px; padding:18px; cursor:pointer;
+  transition:transform .2s, box-shadow .2s;
+  border:1px solid;
+}
+.client-card:hover { transform:translateY(-4px); }
+
+/* Risk colours */
+.risk-red    { border-color:rgba(239,68,68,.28);  background:rgba(239,68,68,.07);  }
+.risk-amber  { border-color:rgba(245,158,11,.28); background:rgba(245,158,11,.07); }
+.risk-green  { border-color:rgba(16,185,129,.28); background:rgba(16,185,129,.07); }
+.risk-red:hover    { box-shadow:0 14px 44px rgba(0,0,0,.4),0 0 0 1px rgba(239,68,68,.3);  }
+.risk-amber:hover  { box-shadow:0 14px 44px rgba(0,0,0,.4),0 0 0 1px rgba(245,158,11,.3); }
+.risk-green:hover  { box-shadow:0 14px 44px rgba(0,0,0,.4),0 0 0 1px rgba(16,185,129,.3); }
+
+.cc-head  { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; }
+.cc-left  { display:flex; align-items:flex-start; gap:10px; }
+.cc-dot   { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.cc-name  { color:#fff; font-weight:600; font-size:14px; line-height:1.3; }
+.cc-meta  { color:var(--text3); font-size:11px; margin-top:2px; }
+.risk-badge { border-radius:6px; padding:3px 9px; font-size:11px; font-weight:600; white-space:nowrap; }
+.rb-red   { color:var(--red);   background:rgba(239,68,68,.12);  border:1px solid rgba(239,68,68,.25);  }
+.rb-amber { color:var(--amber); background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.25); }
+.rb-green { color:var(--green); background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25); }
+
+.cc-score-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.cc-score-lbl { color:var(--text3); font-size:11px; }
+.cc-score-val { font-weight:700; font-size:15px; font-family:var(--font-head); }
+.score-track { height:4px; background:rgba(255,255,255,.08); border-radius:2px; margin-bottom:14px; overflow:hidden; }
+.score-fill  { height:100%; border-radius:2px; transition:width .6s ease; }
+
+.cc-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+.cc-kpi  { text-align:center; }
+.cc-kpi-val { color:#fff; font-weight:700; font-size:13px; font-family:var(--font-head); }
+.cc-kpi-lbl { color:var(--text3); font-size:10px; margin-top:2px; }
+.up   { color:var(--red)!important; }
+.up-ok { color:var(--green)!important; }
+.warn { color:var(--amber)!important; }
+
+.cc-renewal { display:flex; align-items:center; gap:6px; border-top:1px solid; padding-top:10px; }
+.cc-renewal-txt { font-size:12px; flex:1; }
+.cc-members { color:var(--text3); font-size:11px; }
+
+/* ═══════════════════════════════════════════════
+   CLIENT DASHBOARD
+═══════════════════════════════════════════════ */
+.back-btn { background:rgba(255,255,255,.06); border:1px solid var(--border2); border-radius:8px; padding:6px 13px; color:var(--text2); font-size:13px; transition:all .15s; }
+.back-btn:hover { background:rgba(255,255,255,.1); color:#fff; }
+.date-filter { display:flex; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; padding:3px; }
+.df-btn { background:transparent; border:none; border-radius:7px; padding:6px 14px; color:var(--text3); font-size:12px; transition:all .15s; }
+.df-btn.active { background:rgba(0,164,228,.16); color:var(--blue); font-weight:600; }
+
+.kpi-ribbon { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:20px; }
+.kpi-card { background:rgba(255,255,255,.03); border:1px solid var(--border); border-top:2px solid; border-radius:var(--radius); padding:14px 16px; }
+.kpi-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.kpi-icon  { font-size:16px; }
+.kpi-val   { font-family:var(--font-head); font-weight:700; font-size:18px; }
+.kpi-name  { color:#fff; font-size:12px; font-weight:600; margin-bottom:2px; }
+.kpi-sub   { color:var(--text3); font-size:11px; }
+
+.tabs { display:flex; gap:4px; margin-bottom:20px; background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:10px; padding:4px; }
+.tab-btn { flex:1; background:transparent; border:none; color:var(--text3); font-size:13px; font-weight:500; padding:8px 12px; cursor:pointer; border-radius:7px; transition:all .15s; }
+.tab-btn.active { background:rgba(0,164,228,.15); color:var(--blue); font-weight:600; }
+
+.chart-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
+.chart-title { color:#fff; font-weight:600; font-size:15px; font-family:var(--font-head); }
+.chart-sub   { color:var(--text3); font-size:12px; margin-top:2px; }
+
+.chart-row   { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px; }
+.chart-wrap  { position:relative; }
+
+.toggle-grp { display:flex; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:8px; padding:2px; }
+.tgl { background:transparent; border:none; color:var(--text3); font-size:12px; padding:5px 12px; cursor:pointer; border-radius:6px; transition:all .15s; }
+.tgl.active { background:rgba(0,164,228,.15); color:var(--blue); font-weight:600; }
+
+/* Table rows */
+.tbl-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.05); cursor:pointer; transition:background .12s; }
+.tbl-row:hover { background:rgba(255,255,255,.03); margin:0 -8px; padding:10px 8px; border-radius:6px; }
+.tbl-rank { color:var(--text3); font-size:12px; width:28px; flex-shrink:0; }
+.tbl-main { width:200px; flex-shrink:0; }
+.tbl-name { color:#fff; font-size:13px; font-weight:500; }
+.tbl-sub  { color:var(--text3); font-size:11px; margin-top:2px; }
+.tbl-bar-wrap { flex:1; height:6px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+.tbl-bar  { height:100%; border-radius:3px; transition:width .5s ease; }
+.tbl-val  { color:#fff; font-size:13px; font-weight:700; font-family:var(--font-head); width:88px; text-align:right; flex-shrink:0; }
+.tbl-arr  { color:var(--text3); font-size:13px; width:20px; text-align:center; }
+
+/* Claims table */
+.claims-table { width:100%; border-collapse:collapse; min-width:780px; }
+.claims-table th { color:var(--text3); font-size:11px; font-weight:600; text-align:left; padding:8px 12px; border-bottom:1px solid var(--border2); letter-spacing:.5px; text-transform:uppercase; }
+.claims-table td { color:var(--text2); font-size:13px; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.04); }
+.claims-table tr:hover td { background:rgba(255,255,255,.02); }
+.claim-id { color:var(--blue)!important; font-family:monospace; font-size:12px; }
+.net-tag  { border-radius:4px; padding:2px 8px; font-size:11px; font-weight:600; }
+.net-in   { background:rgba(16,185,129,.12); color:var(--green); border:1px solid rgba(16,185,129,.28); }
+.net-out  { background:rgba(239,68,68,.12); color:var(--red); border:1px solid rgba(239,68,68,.28); }
+
+/* ═══════════════════════════════════════════════
+   POPULATION HEALTH
+═══════════════════════════════════════════════ */
+.bm-selector { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.bm-lbl { color:var(--text3); font-size:12px; }
+.bm-btn { background:rgba(255,255,255,.04); border:1px solid var(--border2); border-radius:8px; padding:7px 14px; color:var(--text2); font-size:13px; transition:all .15s; }
+.bm-btn.active { background:rgba(0,164,228,.15); border-color:rgba(0,164,228,.4); color:var(--blue); font-weight:600; }
+
+.pop-top { display:grid; grid-template-columns:300px 1fr; gap:16px; margin-bottom:16px; }
+.tier-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.tier-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.tier-name { color:var(--text2); font-size:12px; width:100px; flex-shrink:0; }
+.tier-bar-wrap { flex:1; height:6px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+.tier-bar { height:100%; border-radius:3px; transition:width .65s ease; }
+.tier-pct { font-weight:700; font-size:13px; font-family:var(--font-head); width:36px; text-align:right; }
+.tier-count { color:var(--text3); font-size:11px; width:38px; text-align:right; }
+
+.var-card { display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.03); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+.var-rank { color:var(--text3); font-size:12px; width:22px; flex-shrink:0; }
+.var-main { flex:1; }
+.var-name { color:#fff; font-size:13px; font-weight:500; margin-bottom:3px; }
+.var-detail { color:var(--text3); font-size:12px; }
+.var-cl   { color:var(--blue); font-weight:600; }
+.var-bn   { color:var(--text2); font-weight:600; }
+.var-badge { border-radius:6px; padding:4px 10px; font-size:12px; font-weight:700; flex-shrink:0; }
+.vb-above { background:rgba(239,68,68,.1); color:var(--red); border:1px solid rgba(239,68,68,.28); }
+.vb-below { background:rgba(16,185,129,.1); color:var(--green); border:1px solid rgba(16,185,129,.28); }
+
+.demo-row  { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-top:14px; border-top:1px solid var(--border); margin-top:8px; }
+.demo-title { color:var(--text3); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; margin-bottom:10px; }
+.demo-item  { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.demo-lbl   { color:var(--text3); font-size:11px; width:36px; flex-shrink:0; }
+.demo-bar-w { flex:1; height:5px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+.demo-bar   { height:100%; border-radius:3px; }
+.demo-pct   { color:var(--text3); font-size:11px; width:28px; text-align:right; }
+
+.idx-row { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.idx-cond { color:var(--text2); font-size:13px; width:180px; flex-shrink:0; }
+.idx-bar-area { flex:1; display:flex; align-items:center; position:relative; height:20px; }
+.idx-left  { flex:1; display:flex; justify-content:flex-end; align-items:center; }
+.idx-right { flex:1; display:flex; justify-content:flex-start; align-items:center; }
+.idx-bar-l { height:8px; border-radius:4px 0 0 4px; transition:width .65s; }
+.idx-mid   { width:2px; height:20px; background:rgba(255,255,255,.15); flex-shrink:0; }
+.idx-bar-r { height:8px; border-radius:0 4px 4px 0; transition:width .65s; }
+.idx-val   { font-family:var(--font-head); font-weight:700; font-size:14px; width:80px; text-align:right; flex-shrink:0; }
+.idx-note  { font-size:11px; font-weight:400; opacity:.75; }
+.idx-legend { display:flex; justify-content:space-between; margin-top:16px; padding-top:12px; border-top:1px solid var(--border); font-size:11px; }
+
+/* notification panel */
+.notif-panel {
+  position:absolute; top:calc(100% + 8px); right:0; width:315px;
+  background:#0d1e35; border:1px solid var(--border2);
+  border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,.5);
+  z-index:200; overflow:hidden; display:none;
+}
+.notif-panel.open { display:block; animation:fadeIn .2s ease; }
+.notif-hdr { padding:12px 16px; color:#fff; font-weight:600; font-size:13px; border-bottom:1px solid var(--border); }
+.notif-item { display:flex; gap:10px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; transition:background .12s; }
+.notif-item:hover { background:rgba(255,255,255,.03); }
+.notif-txt  { color:var(--text2); font-size:12px; line-height:1.5; }
+.notif-time { color:var(--text3); font-size:11px; margin-top:3px; }
+
+/* Overlay for closing dropdowns */
+#overlay { position:fixed; inset:0; z-index:100; display:none; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN PAGE ═══════════════ -->
+<div id="login-page">
+  <div class="login-bg">
+    <div class="bg-grid"></div>
+    <div class="bg-blob1"></div>
+    <div class="bg-blob2"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-accent"></div>
+    <div class="login-logo-row">
+      <div class="login-logo-box">M</div>
+      <div>
+        <div class="login-brand">MARSH</div>
+        <div class="login-subbrand">Global Employee Benefits</div>
+      </div>
+    </div>
+    <div class="login-divider"></div>
+    <div class="login-title">Claims Analytics Platform</div>
+    <div class="login-sub">Sign in with your Marsh corporate credentials to access the dashboard.</div>
+    <button class="sso-btn" id="sso-btn">
+      <div class="sso-btn-inner">
+        <div class="btn-spinner" id="btn-spinner"></div>
+        <span id="btn-text">Continue with Marsh SSO</span>
+      </div>
+    </button>
+    <div class="login-info">
+      <div class="info-icon">🔒</div>
+      <div>
+        <div class="info-title">Secure Single Sign-On</div>
+        <div class="info-desc">Protected by Marsh Identity Platform · ISO 27001 Certified</div>
+      </div>
+    </div>
+    <div class="poc-badge-row">
+      <span class="poc-badge">POC DEMO</span>
+      <span class="poc-hint">Click the button to simulate SSO login</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP SHELL ═══════════════ -->
+<div id="app" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-box">M</div>
+      <div class="logo-text">
+        <div class="brand">MARSH</div>
+        <div class="tagline">Claims Analytics</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="portfolio">
+        <span class="nav-icon">⬡</span><span class="nav-label">Portfolio Heatmap</span>
+      </button>
+      <button class="nav-item" data-page="client">
+        <span class="nav-icon">◈</span><span class="nav-label">Client Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="population">
+        <span class="nav-icon">◉</span><span class="nav-label">Population Health</span>
+      </button>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-user">
+      <div class="user-avatar">NG</div>
+      <div class="user-info">
+        <div class="uname">Neha Gupta</div>
+        <div class="urole">Regional EB Leader · APAC</div>
+      </div>
+      <button class="sidebar-toggle" id="sidebar-toggle">◀</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div id="main">
+    <!-- TOPBAR -->
+    <header id="topbar">
+      <div class="breadcrumb">
+        <span class="bc-home">Dashboard</span>
+        <span class="bc-sep">/</span>
+        <span class="bc-curr" id="bc-current">Portfolio Heatmap</span>
+      </div>
+      <div class="topbar-right">
+        <div style="position:relative;">
+          <button class="notif-btn" id="notif-btn">🔔<div class="notif-dot"></div></button>
+          <div class="notif-panel" id="notif-panel">
+            <div class="notif-hdr">Alerts</div>
+            <div class="notif-item"><span>🔴</span><div><div class="notif-txt">Stellar Airways — Risk Score 91, renewal in 14 days</div><div class="notif-time">2h ago</div></div></div>
+            <div class="notif-item"><span>🟠</span><div><div class="notif-txt">RetailMax Group — Trend jumped to 21.7%</div><div class="notif-time">5h ago</div></div></div>
+            <div class="notif-item"><span>🟠</span><div><div class="notif-txt">EnergyPlus Corp — Risk Score crossed 80</div><div class="notif-time">1d ago</div></div></div>
+          </div>
+        </div>
+        <div class="divider-v"></div>
+        <div class="top-user">
+          <div class="top-avatar">NG</div>
+          <div>
+            <div class="top-uname">Neha Gupta</div>
+            <div class="top-urole">APAC · Regional EB Leader</div>
+          </div>
+        </div>
+        <button class="signout-btn" id="signout-btn">Sign Out</button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div id="content">
+
+      <!-- ══ PAGE: PORTFOLIO ══ -->
+      <div id="page-portfolio" class="page active">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Portfolio Overview</div>
+            <div class="page-sub">Global Employee Benefits · 12 Active Clients</div>
+          </div>
+          <div class="live-badge"><div class="live-dot"></div><span class="live-txt">Live Data</span></div>
+        </div>
+        <div class="summary-strip">
+          <div class="sum-card"><span class="sum-icon">◈</span><div class="sum-value" style="color:var(--blue)">12</div><div class="sum-label">Total Clients</div></div>
+          <div class="sum-card"><span class="sum-icon" style="color:var(--red)">●</span><div class="sum-value" style="color:var(--red)">4</div><div class="sum-label">High Risk</div></div>
+          <div class="sum-card"><span class="sum-icon" style="color:var(--amber)">●</span><div class="sum-value" style="color:var(--amber)">5</div><div class="sum-label">Medium Risk</div></div>
+          <div class="sum-card"><span class="sum-icon" style="color:var(--green)">●</span><div class="sum-value" style="color:var(--green)">3</div><div class="sum-label">Low Risk</div></div>
+          <div class="sum-card"><span class="sum-icon" style="color:#f97316">⏱</span><div class="sum-value" style="color:#f97316">3</div><div class="sum-label">Renewing ≤90d</div></div>
+        </div>
+        <div class="filter-bar">
+          <div class="search-box"><span>🔍</span><input id="search-input" type="text" placeholder="Search client or country..."></div>
+          <select class="sel" id="filter-region"><option value="">Region: All</option><option value="APAC">Region: APAC</option><option value="EMEA">Region: EMEA</option><option value="Americas">Region: Americas</option></select>
+          <select class="sel" id="filter-risk"><option value="">Risk: All</option><option value="red">Risk: High</option><option value="amber">Risk: Medium</option><option value="green">Risk: Low</option></select>
+          <select class="sel" id="filter-sort"><option value="risk">Sort: Risk Score</option><option value="pmpy">Sort: PMPY</option><option value="trend">Sort: Trend %</option></select>
+          <div class="result-count" id="result-count">12 clients</div>
+        </div>
+        <div id="client-grid"></div>
+      </div>
+
+      <!-- ══ PAGE: CLIENT DASHBOARD ══ -->
+      <div id="page-client" class="page">
+        <div class="page-header">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <button class="back-btn" id="back-btn">← Back</button>
+            <div>
+              <div class="page-title" id="cd-title">TechCorp Asia Ltd</div>
+              <div class="page-sub" id="cd-sub">Singapore · Technology · 1,240 Members</div>
+            </div>
+          </div>
+          <div class="date-filter">
+            <button class="df-btn active">Rolling 12M</button>
+            <button class="df-btn">Policy Year</button>
+            <button class="df-btn">Custom</button>
+          </div>
+        </div>
+        <!-- KPI Ribbon -->
+        <div class="kpi-ribbon">
+          <div class="kpi-card" style="border-top-color:var(--blue)"><div class="kpi-top"><span class="kpi-icon">💰</span><span class="kpi-val" style="color:var(--blue)">$2,840</span></div><div class="kpi-name">PMPY</div><div class="kpi-sub">Per member per year</div></div>
+          <div class="kpi-card" style="border-top-color:var(--indigo)"><div class="kpi-top"><span class="kpi-icon">📦</span><span class="kpi-val" style="color:var(--indigo)">$3.5M</span></div><div class="kpi-name">Total Cost</div><div class="kpi-sub">Annual paid claims</div></div>
+          <div class="kpi-card" style="border-top-color:var(--red)"><div class="kpi-top"><span class="kpi-icon">📈</span><span class="kpi-val" style="color:var(--red)">+14.2%</span></div><div class="kpi-name">Trend</div><div class="kpi-sub">vs prior period</div></div>
+          <div class="kpi-card" style="border-top-color:var(--amber)"><div class="kpi-top"><span class="kpi-icon">⚠</span><span class="kpi-val" style="color:var(--amber)">6.2%</span></div><div class="kpi-name">High Cost %</div><div class="kpi-sub">Members over threshold</div></div>
+          <div class="kpi-card" style="border-top-color:#ec4899"><div class="kpi-top"><span class="kpi-icon">🏥</span><span class="kpi-val" style="color:#ec4899">18.4%</span></div><div class="kpi-name">Chronic %</div><div class="kpi-sub">Long-term illness</div></div>
+          <div class="kpi-card" style="border-top-color:var(--green)"><div class="kpi-top"><span class="kpi-icon">🔗</span><span class="kpi-val" style="color:var(--green)">74.3%</span></div><div class="kpi-name">In-Network %</div><div class="kpi-sub">Network utilisation</div></div>
+        </div>
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="overview">Overview</button>
+          <button class="tab-btn" data-tab="diagnoses">Top Diagnoses</button>
+          <button class="tab-btn" data-tab="providers">Top Providers</button>
+          <button class="tab-btn" data-tab="claims">Claim Detail</button>
+        </div>
+        <!-- Tab Panels -->
+        <div id="tab-overview">
+          <div class="card" style="margin-bottom:16px">
+            <div class="chart-head"><div><div class="chart-title">Monthly Cost Trend</div><div class="chart-sub">Paid claims by month</div></div></div>
+            <canvas id="trendChart" height="80"></canvas>
+          </div>
+          <div class="chart-row">
+            <div class="card"><div class="chart-head"><div class="chart-title">Inpatient vs Outpatient</div></div><canvas id="ipopChart" height="160"></canvas></div>
+            <div class="card"><div class="chart-head"><div class="chart-title">GP vs Specialist</div></div><canvas id="gpChart" height="160"></canvas></div>
+            <div class="card"><div class="chart-head"><div class="chart-title">Network Utilisation</div></div><canvas id="netChart" height="160"></canvas></div>
+          </div>
+        </div>
+        <div id="tab-diagnoses" style="display:none">
+          <div class="card">
+            <div class="chart-head"><div><div class="chart-title">Top 10 Diagnoses</div><div class="chart-sub">Click a row to view claims</div></div><div class="toggle-grp"><button class="tgl active" data-dview="cost">By Cost</button><button class="tgl" data-dview="prev">By Prevalence</button><button class="tgl" data-dview="count">By Count</button></div></div>
+            <div id="diag-list"></div>
+          </div>
+        </div>
+        <div id="tab-providers" style="display:none">
+          <div class="card">
+            <div class="chart-head"><div><div class="chart-title">Top 10 Providers</div><div class="chart-sub">Hospitals &amp; clinics</div></div><div class="toggle-grp"><button class="tgl active" data-pview="cost">By Cost</button><button class="tgl" data-pview="visits">By Visits</button><button class="tgl" data-pview="members">By Members</button></div></div>
+            <div id="prov-list"></div>
+          </div>
+        </div>
+        <div id="tab-claims" style="display:none">
+          <div class="card"><div class="chart-head"><div class="chart-title">Claim-Level Detail</div><div class="chart-sub">Individual claim records · Sample data</div></div><div style="overflow-x:auto;margin-top:8px"><table class="claims-table"><thead><tr><th>Claim ID</th><th>Date</th><th>Member</th><th>Diagnosis</th><th>Provider</th><th>Amount</th><th>Network</th><th>Type</th></tr></thead><tbody id="claims-tbody"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <!-- ══ PAGE: POPULATION HEALTH ══ -->
+      <div id="page-population" class="page">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Population Health Scan</div>
+            <div class="page-sub" id="pop-sub">TechCorp Asia Ltd · Clinical Risk Stratification &amp; Benchmarking</div>
+          </div>
+          <div class="bm-selector">
+            <span class="bm-lbl">Benchmark:</span>
+            <button class="bm-btn active" data-bm="industry">Industry</button>
+            <button class="bm-btn" data-bm="geography">Geography</button>
+            <button class="bm-btn" data-bm="size">Company Size</button>
+          </div>
+        </div>
+        <div class="pop-top">
+          <!-- Risk Tiers -->
+          <div class="card">
+            <div class="chart-title" style="margin-bottom:4px">Risk Tier Distribution</div>
+            <div class="chart-sub" style="margin-bottom:16px">1,240 total members</div>
+            <div id="tier-bars"></div>
+            <canvas id="tierChart" height="160" style="margin-top:8px"></canvas>
+          </div>
+          <!-- Variance + Demographics -->
+          <div class="card">
+            <div class="chart-title" style="margin-bottom:4px">Top 3 Diagnosis Variance</div>
+            <div class="chart-sub" style="margin-bottom:14px">Highest deviation from benchmark</div>
+            <div id="var-list"></div>
+            <div class="demo-row">
+              <div><div class="demo-title">Age Distribution</div><div id="age-bars"></div></div>
+              <div><div class="demo-title">Gender Split</div><div id="gender-bars"></div></div>
+            </div>
+          </div>
+        </div>
+        <!-- Prevalence Chart -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="chart-head"><div><div class="chart-title">Diagnosis Prevalence vs Benchmark</div><div class="chart-sub">% of members affected by each condition</div></div></div>
+          <canvas id="prevChart" height="90"></canvas>
+        </div>
+        <!-- Cost Index -->
+        <div class="card">
+          <div class="chart-head"><div><div class="chart-title">Cost Index vs Benchmark</div><div class="chart-sub">100 = benchmark average · Above 100 means client spends more</div></div></div>
+          <div id="idx-list"></div>
+          <div class="idx-legend"><span style="color:var(--green)">● Below Benchmark (cost-efficient)</span><span style="color:var(--text3)">100 = Benchmark</span><span style="color:var(--red)">● Above Benchmark (higher cost)</span></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div id="overlay"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════
+const clients = [
+  {id:'C001',name:'TechCorp Asia Ltd',       industry:'Technology',    region:'APAC',    country:'Singapore', pmpy:2840,trend:14.2, chronic:18.4,highCost:6.2, risk:78, renewal:'2025-03-15',members:1240,totalCost:3521600},
+  {id:'C002',name:'GlobalBank Financial',    industry:'Banking',       region:'APAC',    country:'Hong Kong', pmpy:3120,trend:8.5,  chronic:22.1,highCost:8.1, risk:62, renewal:'2025-05-01',members:3400,totalCost:10608000},
+  {id:'C003',name:'Pharma Solutions Inc',    industry:'Healthcare',    region:'APAC',    country:'India',     pmpy:1950,trend:-2.3, chronic:14.8,highCost:4.5, risk:35, renewal:'2025-08-20',members:2100,totalCost:4095000},
+  {id:'C004',name:'RetailMax Group',         industry:'Retail',        region:'APAC',    country:'Australia', pmpy:2650,trend:21.7, chronic:26.3,highCost:9.8, risk:88, renewal:'2025-02-28',members:890, totalCost:2358500},
+  {id:'C005',name:'AutoDrive Motors',        industry:'Manufacturing', region:'EMEA',    country:'Germany',   pmpy:4100,trend:5.1,  chronic:19.2,highCost:7.3, risk:51, renewal:'2025-06-10',members:5600,totalCost:22960000},
+  {id:'C006',name:'CloudSystems Europe',     industry:'Technology',    region:'EMEA',    country:'UK',        pmpy:3880,trend:11.4, chronic:16.7,highCost:5.9, risk:67, renewal:'2025-04-18',members:720, totalCost:2793600},
+  {id:'C007',name:'FoodChain Americas',      industry:'Food & Beverage',region:'Americas',country:'USA',      pmpy:5200,trend:3.8,  chronic:28.5,highCost:11.2,risk:44, renewal:'2025-09-01',members:4200,totalCost:21840000},
+  {id:'C008',name:'EnergyPlus Corp',         industry:'Energy',        region:'Americas',country:'Canada',    pmpy:3450,trend:18.9, chronic:23.7,highCost:10.1,risk:82, renewal:'2025-03-30',members:1800,totalCost:6210000},
+  {id:'C009',name:'LogiFreight Ltd',         industry:'Logistics',     region:'APAC',    country:'Japan',     pmpy:2200,trend:-1.2, chronic:12.3,highCost:3.8, risk:28, renewal:'2025-10-15',members:3100,totalCost:6820000},
+  {id:'C010',name:'ConstructX Holdings',     industry:'Construction',  region:'APAC',    country:'China',     pmpy:1780,trend:9.6,  chronic:17.9,highCost:6.7, risk:55, renewal:'2025-07-22',members:6800,totalCost:12104000},
+  {id:'C011',name:'MediGroup Services',      industry:'Healthcare',    region:'EMEA',    country:'France',    pmpy:4650,trend:6.2,  chronic:31.4,highCost:12.5,risk:59, renewal:'2025-05-30',members:950, totalCost:4417500},
+  {id:'C012',name:'Stellar Airways',         industry:'Aviation',      region:'APAC',    country:'UAE',       pmpy:3300,trend:24.1, chronic:20.8,highCost:8.4, risk:91, renewal:'2025-02-14',members:2200,totalCost:7260000},
+];
+
+const diagnoses = [
+  {rank:1,name:'Type 2 Diabetes',    icd:'E11',cost:420000,prev:8.4, count:312},
+  {rank:2,name:'Hypertension',       icd:'I10',cost:380000,prev:11.2,count:489},
+  {rank:3,name:'Lower Back Pain',    icd:'M54',cost:290000,prev:6.8, count:267},
+  {rank:4,name:'Anxiety Disorder',   icd:'F41',cost:245000,prev:5.2, count:198},
+  {rank:5,name:'Hyperlipidaemia',    icd:'E78',cost:210000,prev:7.1, count:298},
+  {rank:6,name:'Asthma',             icd:'J45',cost:185000,prev:4.3, count:164},
+  {rank:7,name:'Migraine',           icd:'G43',cost:142000,prev:3.8, count:145},
+  {rank:8,name:'Osteoarthritis',     icd:'M15',cost:128000,prev:2.9, count:108},
+  {rank:9,name:'GERD / Acid Reflux', icd:'K21',cost:98000, prev:5.6, count:218},
+  {rank:10,name:'UTI',               icd:'N39',cost:76000, prev:3.1, count:119},
+];
+
+const providers = [
+  {rank:1,name:'Mount Elizabeth Hospital',      type:'Hospital',cost:680000,visits:1240,members:380},
+  {rank:2,name:'Gleneagles Medical Centre',     type:'Hospital',cost:540000,visits:980, members:290},
+  {rank:3,name:'Raffles Medical Group',         type:'Clinic',  cost:320000,visits:2100,members:560},
+  {rank:4,name:'Singapore General Hospital',    type:'Hospital',cost:290000,visits:640, members:210},
+  {rank:5,name:'Parkway Shenton',               type:'Clinic',  cost:240000,visits:1800,members:480},
+  {rank:6,name:'National University Hospital',  type:'Hospital',cost:210000,visits:420, members:145},
+  {rank:7,name:'Asia MediCentre',               type:'Clinic',  cost:180000,visits:1400,members:390},
+  {rank:8,name:'Dr. Tan & Partners',            type:'Clinic',  cost:145000,visits:2400,members:620},
+  {rank:9,name:'Thomson Medical Centre',        type:'Hospital',cost:120000,visits:310, members:98},
+  {rank:10,name:'Healthway Medical',            type:'Clinic',  cost:98000, visits:1900,members:510},
+];
+
+const claimsData = [
+  {id:'CLM-001842',date:'2024-11-12',member:'Member #0482',diag:'Type 2 Diabetes',     prov:'Mount Elizabeth Hospital',amount:4820,network:'In-Network', type:'Inpatient'},
+  {id:'CLM-001756',date:'2024-11-08',member:'Member #0291',diag:'Hypertension',         prov:'Raffles Medical Group',    amount:380, network:'In-Network', type:'Outpatient'},
+  {id:'CLM-001623',date:'2024-10-29',member:'Member #0847',diag:'Lower Back Pain',      prov:'Gleneagles Medical',       amount:1240,network:'In-Network', type:'Outpatient'},
+  {id:'CLM-001598',date:'2024-10-25',member:'Member #0134',diag:'Anxiety Disorder',     prov:'Parkway Shenton',          amount:620, network:'Out-of-Network',type:'Outpatient'},
+  {id:'CLM-001501',date:'2024-10-18',member:'Member #0673',diag:'Asthma',               prov:'Singapore General',        amount:2890,network:'In-Network', type:'Inpatient'},
+];
+
+const monthlyTrend = [268,278,285,291,298,305,312,318,295,301,288,283];
+
+const bmData = {
+  industry:[
+    {cond:'Type 2 Diabetes',  clientPct:8.4, bmPct:6.2, idx:135},
+    {cond:'Hypertension',     clientPct:11.2,bmPct:9.8, idx:114},
+    {cond:'Anxiety',          clientPct:5.2, bmPct:4.1, idx:127},
+    {cond:'Hyperlipidaemia',  clientPct:7.1, bmPct:7.5, idx:95},
+    {cond:'Asthma',           clientPct:4.3, bmPct:5.1, idx:84},
+    {cond:'Musculoskeletal',  clientPct:6.8, bmPct:5.2, idx:131},
+  ],
+  geography:[
+    {cond:'Type 2 Diabetes',  clientPct:8.4, bmPct:9.1, idx:92},
+    {cond:'Hypertension',     clientPct:11.2,bmPct:12.3,idx:91},
+    {cond:'Anxiety',          clientPct:5.2, bmPct:3.8, idx:137},
+    {cond:'Hyperlipidaemia',  clientPct:7.1, bmPct:8.2, idx:87},
+    {cond:'Asthma',           clientPct:4.3, bmPct:4.9, idx:88},
+    {cond:'Musculoskeletal',  clientPct:6.8, bmPct:4.8, idx:142},
+  ],
+  size:[
+    {cond:'Type 2 Diabetes',  clientPct:8.4, bmPct:7.1, idx:118},
+    {cond:'Hypertension',     clientPct:11.2,bmPct:10.4,idx:108},
+    {cond:'Anxiety',          clientPct:5.2, bmPct:4.5, idx:116},
+    {cond:'Hyperlipidaemia',  clientPct:7.1, bmPct:6.9, idx:103},
+    {cond:'Asthma',           clientPct:4.3, bmPct:4.7, idx:91},
+    {cond:'Musculoskeletal',  clientPct:6.8, bmPct:5.8, idx:117},
+  ],
+};
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function fmtMoney(n){return n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1000?'$'+(n/1000).toFixed(0)+'K':'$'+n;}
+function fmtNum(n){return n>=1000?+(n/1000).toFixed(1)+'K':n;}
+function daysTo(d){return Math.ceil((new Date(d)-new Date())/(864e5));}
+function riskClass(s){return s>=75?'red':s>=50?'amber':'green';}
+function riskLabel(s){return s>=75?'High Risk':s>=50?'Medium Risk':'Low Risk';}
+function dotColor(s){return s>=75?'var(--red)':s>=50?'var(--amber)':'var(--green)';}
+
+let activeChart = {};
+function destroyChart(id){if(activeChart[id]){activeChart[id].destroy();delete activeChart[id];}}
+
+Chart.defaults.color = 'rgba(255,255,255,.45)';
+Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+// ═══════════════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════════════
+$('#sso-btn').on('click', function(){
+  $('#btn-text').text('Authenticating via SSO...');
+  $('#btn-spinner').show();
+  $(this).prop('disabled',true);
+  setTimeout(()=>{
+    $('#login-page').fadeOut(400,()=>{ $('#app').fadeIn(300); renderPortfolio(); });
+  },1800);
+});
+$('#signout-btn').on('click',()=>{ $('#app').fadeOut(300,()=>{ $('#login-page').fadeIn(400); $('#btn-text').text('Continue with Marsh SSO'); $('#btn-spinner').hide(); $('#sso-btn').prop('disabled',false); }); });
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+const pageNames = {portfolio:'Portfolio Heatmap',client:'Client Dashboard',population:'Population Health'};
+function navigate(page){
+  $('.nav-item').removeClass('active');
+  $(`.nav-item[data-page="${page}"]`).addClass('active');
+  $('.page').removeClass('active');
+  $(`#page-${page}`).addClass('active');
+  $('#bc-current').text(pageNames[page]);
+}
+$('.nav-item').on('click',function(){
+  const p=$(this).data('page');
+  if(p==='population') renderPopulation();
+  navigate(p);
+});
+$('#back-btn').on('click',()=>navigate('portfolio'));
+
+// SIDEBAR TOGGLE
+$('#sidebar-toggle').on('click',()=>$('#sidebar').toggleClass('collapsed'));
+
+// NOTIFICATIONS
+$('#notif-btn').on('click',function(e){
+  e.stopPropagation();
+  $('#notif-panel').toggleClass('open');
+  if($('#notif-panel').hasClass('open')) $('#overlay').show(); else $('#overlay').hide();
+});
+$('#overlay').on('click',()=>{ $('#notif-panel').removeClass('open'); $('#overlay').hide(); });
+
+// DATE FILTER TABS
+$(document).on('click','.df-btn',function(){ $('.df-btn').removeClass('active'); $(this).addClass('active'); });
+
+// ═══════════════════════════════════════════════
+// PORTFOLIO
+// ═══════════════════════════════════════════════
+function renderPortfolio(data){
+  data = data || clients;
+  const grid = $('#client-grid').empty();
+  $('#result-count').text(data.length+' clients');
+  data.forEach(c=>{
+    const rc=riskClass(c.risk), days=daysTo(c.renewal), urgent=days<=90;
+    const trendCls = c.trend>15?'up':c.trend<0?'up-ok':'warn';
+    const html=`<div class="client-card risk-${rc} fade-in" data-id="${c.id}">
+      <div class="cc-head">
+        <div class="cc-left">
+          <div class="cc-dot" style="background:${dotColor(c.risk)}"></div>
+          <div><div class="cc-name">${c.name}</div><div class="cc-meta">${c.country} · ${c.industry}</div></div>
+        </div>
+        <span class="risk-badge rb-${rc}">${riskLabel(c.risk)}</span>
+      </div>
+      <div class="cc-score-row"><span class="cc-score-lbl">Risk Score</span><span class="cc-score-val" style="color:${dotColor(c.risk)}">${c.risk}</span></div>
+      <div class="score-track"><div class="score-fill" style="width:${c.risk}%;background:${dotColor(c.risk)}"></div></div>
+      <div class="cc-kpis">
+        <div class="cc-kpi"><div class="cc-kpi-val">$${c.pmpy.toLocaleString()}</div><div class="cc-kpi-lbl">PMPY</div></div>
+        <div class="cc-kpi"><div class="cc-kpi-val ${trendCls}">${c.trend>0?'↑':'↓'}${Math.abs(c.trend)}%</div><div class="cc-kpi-lbl">Trend</div></div>
+        <div class="cc-kpi"><div class="cc-kpi-val">${c.chronic}%</div><div class="cc-kpi-lbl">Chronic</div></div>
+        <div class="cc-kpi"><div class="cc-kpi-val">${fmtMoney(c.totalCost)}</div><div class="cc-kpi-lbl">Total Cost</div></div>
+      </div>
+      <div class="cc-renewal" style="border-color:${urgent?'rgba(249,115,22,.3)':'var(--border)'}">
+        <span>${urgent?'⚠':'📅'}</span>
+        <span class="cc-renewal-txt" style="color:${urgent?'#f97316':'var(--text3)'}">
+          ${days<=0?'Renewal Overdue':days<=90?`Renews in ${days} days`:`Renewal: ${new Date(c.renewal).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`}
+        </span>
+        <span class="cc-members">${c.members.toLocaleString()} members</span>
+      </div>
+    </div>`;
+    grid.append(html);
+  });
+
+  // Card click → go to client dashboard
+  $('.client-card').on('click',function(){
+    const id=$(this).data('id'), c=clients.find(x=>x.id===id);
+    $('#cd-title').text(c.name);
+    $('#cd-sub').text(`${c.country} · ${c.industry} · ${c.members.toLocaleString()} Members`);
+    $('#pop-sub').text(`${c.name} · Clinical Risk Stratification & Benchmarking`);
+    navigate('client');
+    setTimeout(buildClientCharts,50);
+  });
+}
+
+// Filters
+function applyFilters(){
+  let data=[...clients];
+  const q=$('#search-input').val().toLowerCase();
+  const reg=$('#filter-region').val();
+  const risk=$('#filter-risk').val();
+  const sort=$('#filter-sort').val();
+  if(q) data=data.filter(c=>c.name.toLowerCase().includes(q)||c.country.toLowerCase().includes(q));
+  if(reg) data=data.filter(c=>c.region===reg);
+  if(risk) data=data.filter(c=>riskClass(c.risk)===risk);
+  if(sort==='pmpy') data.sort((a,b)=>b.pmpy-a.pmpy);
+  else if(sort==='trend') data.sort((a,b)=>b.trend-a.trend);
+  else data.sort((a,b)=>b.risk-a.risk);
+  renderPortfolio(data);
+}
+$('#search-input,#filter-region,#filter-risk,#filter-sort').on('input change',applyFilters);
+
+// ═══════════════════════════════════════════════
+// CLIENT DASHBOARD
+// ═══════════════════════════════════════════════
+function buildClientCharts(){
+  // Trend Area Chart
+  destroyChart('trendChart');
+  activeChart['trendChart'] = new Chart($('#trendChart')[0],{
+    type:'line',
+    data:{
+      labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      datasets:[{label:'Total Cost ($)',data:monthlyTrend,borderColor:'#00a4e4',borderWidth:2,
+        fill:true,backgroundColor:'rgba(0,164,228,.1)',tension:.35,pointRadius:3,pointBackgroundColor:'#00a4e4'}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>`$${v/1000}K`},grid:{color:'rgba(255,255,255,.05)'}},x:{grid:{display:false}}}}
+  });
+
+  // IP vs OP
+  destroyChart('ipopChart');
+  activeChart['ipopChart'] = new Chart($('#ipopChart')[0],{
+    type:'doughnut',
+    data:{labels:['Inpatient','Outpatient'],datasets:[{data:[40,60],backgroundColor:['#00a4e4','#6366f1'],borderWidth:0,hoverOffset:4}]},
+    options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,font:{size:12}}}}}
+  });
+
+  // GP vs Specialist
+  destroyChart('gpChart');
+  activeChart['gpChart'] = new Chart($('#gpChart')[0],{
+    type:'doughnut',
+    data:{labels:['GP Visits','Specialist'],datasets:[{data:[25,75],backgroundColor:['#10b981','#f59e0b'],borderWidth:0,hoverOffset:4}]},
+    options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,font:{size:12}}}}}
+  });
+
+  // Network
+  destroyChart('netChart');
+  activeChart['netChart'] = new Chart($('#netChart')[0],{
+    type:'doughnut',
+    data:{labels:['In-Network','Out-of-Network'],datasets:[{data:[74.3,25.7],backgroundColor:['#10b981','#ef4444'],borderWidth:0,hoverOffset:4}]},
+    options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,font:{size:12}}}}}
+  });
+
+  renderDiagnoses('cost');
+  renderProviders('cost');
+  renderClaims();
+}
+
+// TABS
+$(document).on('click','.tab-btn',function(){
+  $('.tab-btn').removeClass('active'); $(this).addClass('active');
+  const t=$(this).data('tab');
+  $('#tab-overview,#tab-diagnoses,#tab-providers,#tab-claims').hide();
+  $(`#tab-${t}`).show();
+});
+
+// Diagnoses
+let diagView='cost';
+function renderDiagnoses(view){
+  diagView=view; $('.tgl[data-dview]').removeClass('active'); $(`.tgl[data-dview="${view}"]`).addClass('active');
+  const sorted=[...diagnoses].sort((a,b)=>view==='cost'?b.cost-a.cost:view==='prev'?b.prev-a.prev:b.count-a.count);
+  const maxVal=view==='cost'?sorted[0].cost:view==='prev'?sorted[0].prev:sorted[0].count;
+  const list=$('#diag-list').empty();
+  sorted.forEach(d=>{
+    const val=view==='cost'?d.cost:view==='prev'?d.prev:d.count;
+    const pct=Math.round(val/maxVal*100);
+    const dispVal=view==='cost'?fmtMoney(val):view==='prev'?val+'%':fmtNum(val);
+    list.append(`<div class="tbl-row">
+      <div class="tbl-rank">#${d.rank}</div>
+      <div class="tbl-main"><div class="tbl-name">${d.name}</div><div class="tbl-sub">ICD: ${d.icd}</div></div>
+      <div class="tbl-bar-wrap"><div class="tbl-bar" style="width:${pct}%;background:var(--blue)"></div></div>
+      <div class="tbl-val">${dispVal}</div><div class="tbl-arr">→</div>
+    </div>`);
+  });
+}
+$(document).on('click','.tgl[data-dview]',function(){ renderDiagnoses($(this).data('dview')); });
+
+// Providers
+let provView='cost';
+function renderProviders(view){
+  provView=view; $('.tgl[data-pview]').removeClass('active'); $(`.tgl[data-pview="${view}"]`).addClass('active');
+  const sorted=[...providers].sort((a,b)=>view==='cost'?b.cost-a.cost:view==='visits'?b.visits-a.visits:b.members-a.members);
+  const maxVal=view==='cost'?sorted[0].cost:view==='visits'?sorted[0].visits:sorted[0].members;
+  const list=$('#prov-list').empty();
+  sorted.forEach(p=>{
+    const val=view==='cost'?p.cost:view==='visits'?p.visits:p.members;
+    const pct=Math.round(val/maxVal*100);
+    list.append(`<div class="tbl-row">
+      <div class="tbl-rank">#${p.rank}</div>
+      <div class="tbl-main"><div class="tbl-name">${p.name}</div><div class="tbl-sub">${p.type}</div></div>
+      <div class="tbl-bar-wrap"><div class="tbl-bar" style="width:${pct}%;background:var(--indigo)"></div></div>
+      <div class="tbl-val">${view==='cost'?fmtMoney(val):fmtNum(val)}</div>
+    </div>`);
+  });
+}
+$(document).on('click','.tgl[data-pview]',function(){ renderProviders($(this).data('pview')); });
+
+function renderClaims(){
+  const tb=$('#claims-tbody').empty();
+  claimsData.forEach(c=>{
+    tb.append(`<tr>
+      <td class="claim-id">${c.id}</td>
+      <td>${c.date}</td><td>${c.member}</td><td>${c.diag}</td><td>${c.prov}</td>
+      <td style="color:var(--blue);font-weight:700">$${c.amount.toLocaleString()}</td>
+      <td><span class="net-tag ${c.network==='In-Network'?'net-in':'net-out'}">${c.network}</span></td>
+      <td>${c.type}</td>
+    </tr>`);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// POPULATION HEALTH
+// ═══════════════════════════════════════════════
+let activeBM='industry';
+let prevChartInst=null, tierChartInst=null;
+
+function renderPopulation(){
+  renderTiers();
+  renderBMData('industry');
+  renderDemographics();
+  // Re-draw if benchmark changes
+  $('.bm-btn').off('click').on('click',function(){
+    $('.bm-btn').removeClass('active'); $(this).addClass('active');
+    activeBM=$(this).data('bm');
+    renderBMData(activeBM);
+  });
+}
+
+function renderTiers(){
+  const tiers=[
+    {name:'Low Risk',    members:682, pct:55,color:'#10b981'},
+    {name:'Medium Risk', members:322, pct:26,color:'#f59e0b'},
+    {name:'High Risk',   members:161, pct:13,color:'#ef4444'},
+    {name:'Very High',   members:75,  pct:6, color:'#8b5cf6'},
+  ];
+  const tb=$('#tier-bars').empty();
+  tiers.forEach(t=>{
+    tb.append(`<div class="tier-row">
+      <div class="tier-dot" style="background:${t.color}"></div>
+      <div class="tier-name">${t.name}</div>
+      <div class="tier-bar-wrap"><div class="tier-bar" style="width:${t.pct}%;background:${t.color}"></div></div>
+      <div class="tier-pct" style="color:${t.color}">${t.pct}%</div>
+      <div class="tier-count">${t.members}</div>
+    </div>`);
+  });
+
+  destroyChart('tierChart');
+  activeChart['tierChart'] = new Chart($('#tierChart')[0],{
+    type:'doughnut',
+    data:{labels:tiers.map(t=>t.name),datasets:[{data:tiers.map(t=>t.members),backgroundColor:tiers.map(t=>t.color),borderWidth:0,hoverOffset:4}]},
+    options:{cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10,font:{size:11}}}}}
+  });
+}
+
+function renderBMData(bm){
+  const data=bmData[bm];
+  // Top 3 variance
+  const sorted=[...data].sort((a,b)=>Math.abs(b.clientPct-b.bmPct)-Math.abs(a.clientPct-a.bmPct)).slice(0,3);
+  const vl=$('#var-list').empty();
+  sorted.forEach((v,i)=>{
+    const diff=(v.clientPct-v.bmPct).toFixed(1), above=v.clientPct>v.bmPct;
+    vl.append(`<div class="var-card">
+      <div class="var-rank">#${i+1}</div>
+      <div class="var-main">
+        <div class="var-name">${v.cond}</div>
+        <div class="var-detail">Client: <span class="var-cl">${v.clientPct}%</span> · Benchmark: <span class="var-bn">${v.bmPct}%</span></div>
+      </div>
+      <div class="var-badge ${above?'vb-above':'vb-below'}">${above?'↑':'↓'} ${Math.abs(diff)}%</div>
+    </div>`);
+  });
+
+  // Prevalence chart
+  destroyChart('prevChart');
+  activeChart['prevChart'] = new Chart($('#prevChart')[0],{
+    type:'bar',
+    data:{
+      labels:data.map(d=>d.cond),
+      datasets:[
+        {label:'Client %', data:data.map(d=>d.clientPct), backgroundColor:'#00a4e4', borderRadius:4},
+        {label:'Benchmark %', data:data.map(d=>d.bmPct),  backgroundColor:'rgba(255,255,255,.15)', borderRadius:4},
+      ]
+    },
+    options:{responsive:true,plugins:{legend:{position:'top',labels:{boxWidth:10,padding:14,font:{size:12}}}},
+      scales:{y:{ticks:{callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}},x:{grid:{display:false}}}}
+  });
+
+  // Cost index waterfall
+  const il=$('#idx-list').empty();
+  data.forEach(d=>{
+    const above=d.idx>100, barW=Math.min(Math.abs(d.idx-100)*2,50);
+    const color=above?'var(--red)':'var(--green)';
+    il.append(`<div class="idx-row">
+      <div class="idx-cond">${d.cond}</div>
+      <div class="idx-bar-area">
+        <div class="idx-left"><div class="idx-bar-l" style="width:${above?0:barW}%;background:var(--green)"></div></div>
+        <div class="idx-mid"></div>
+        <div class="idx-right"><div class="idx-bar-r" style="width:${above?barW:0}%;background:var(--red)"></div></div>
+      </div>
+      <div class="idx-val" style="color:${color}">${d.idx}<span class="idx-note"> ${above?'↑ +':'↓ -'}${Math.abs(d.idx-100)}</span></div>
+    </div>`);
+  });
+}
+
+function renderDemographics(){
+  const age=[{b:'0–17',pct:5},{b:'18–35',pct:30},{b:'36–50',pct:40},{b:'51+',pct:25}];
+  const gender=[{g:'Male',pct:56,c:'#6366f1'},{g:'Female',pct:43,c:'#ec4899'},{g:'Other',pct:1,c:'#10b981'}];
+  const ab=$('#age-bars').empty();
+  age.forEach(a=>{ ab.append(`<div class="demo-item"><span class="demo-lbl">${a.b}</span><div class="demo-bar-w"><div class="demo-bar" style="width:${a.pct}%;background:var(--blue)"></div></div><span class="demo-pct">${a.pct}%</span></div>`); });
+  const gb=$('#gender-bars').empty();
+  gender.forEach(g=>{ gb.append(`<div class="demo-item"><span class="demo-lbl">${g.g}</span><div class="demo-bar-w"><div class="demo-bar" style="width:${g.pct}%;background:${g.c}"></div></div><span class="demo-pct">${g.pct}%</span></div>`); });
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+$(document).ready(function(){
+  // Portfolio loads after login
+  // Nothing more needed at init
+});
+</script>
+</body>
+</html>
