@@ -29,9 +29,9 @@ const { aggregateClaimsToClients, isClaimsLevelData, normalizeRow } = require(".
 // CONFIG — reads from .env, falls back to values from image
 // ─────────────────────────────────────────────────────────────
 const DB_CONFIG = {
-  token:    process.env.DATABRICKS_TOKEN          || "dap1ce60ce690556e760d3794abd7cd3800c",
-  host:     process.env.DATABRICKS_SERVER_HOSTNAME || "dbc-85bb0ad0-a3c5.cloud.databricks.com",
-  path:     process.env.DATABRICKS_HTTP_PATH       || "/sql/1.0/warehouses/0c6eb0dcfe64781d",
+  token:    process.env.DATABRICKS_TOKEN      
+  host:     process.env.DATABRICKS_SERVER_HOSTNAME 
+  path:     process.env.DATABRICKS_HTTP_PATH      
   // Table to query — set DATABRICKS_TABLE in .env
   // Format: "catalog.schema.table_name"
   table:    process.env.DATABRICKS_TABLE           || null,
