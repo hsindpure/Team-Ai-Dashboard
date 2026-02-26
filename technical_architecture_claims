@@ -1,0 +1,131 @@
+now tell me, if the column names of xlsx file or databrics table changed or increses, then does I need to do anything in code for calculation or it wiil automatically adjusted in calculation , any changes need to d from my side?10:19 AMGreat question. Let me trace exactly how column names flow through the entire system before answering.Read the KEY_MAP in claimsCalculator.jsRead the KEY_MAP in claimsCalculator.jsRead the KEY_MAP in claimsCalculator.jsDoneGood question. Let me give you a clear, honest answer based on exactly how the code works.
+
+The Short Answer
+It depends on which column changed. The system handles some changes automatically, but others require you to add one line to KEY_MAP in claimsCalculator.js.
+
+How the Column Mapping Works
+Every incoming row — whether from Excel or Databricks — passes through normalizeRow() first:
+jsconst lk = rawKey.trim().toLowerCase().replace(/\s+/g, "_");
+const canonical = KEY_MAP[lk] || lk;  // ← the critical fallback
+The || lk fallback means: if the key is not in KEY_MAP, it passes through as-is (lowercased + underscored). This is the key to understanding what's automatic and what's not.
+
+Scenario 1 — Column Renamed to Something Already in KEY_MAP ✅ Automatic
+If your source renames a column but the new name is already a known variant in KEY_MAP, nothing breaks.
+Example: APPROVEDAMOUNT renamed to Approved_Amount
+js// Both already in KEY_MAP → both resolve to "approved_amount"
+"approvedamount":  "approved_amount",
+"approved_amount": "approved_amount",
+Zero code changes needed.
+
+Scenario 2 — Column Renamed to Something NOT in KEY_MAP ⚠️ Add 1 Line
+If the new name is genuinely new (not a variant already listed), the || lk fallback keeps it as a passthrough key. The calculation that reads r.approved_amount won't find any value — it silently gets 0.
+Example: Your Databricks team renames APPROVEDAMOUNT → NET_PAID_AMOUNT
+The normalizer produces net_paid_amount (not found in KEY_MAP), so approved_amount is never set. Every cost KPI goes to ₱0.
+Fix — one line in claimsCalculator.js:
+js"net_paid_amount": "approved_amount",   // ← add this
+That's it. No other file needs to change.
+
+Scenario 3 — New Column Added to the Table ✅ Automatic (mostly)
+If your source adds a brand new column that the system doesn't currently use (e.g. region, sub_branch, premium_amount), it passes through via the || lk fallback and sits quietly in the row object. All existing KPIs keep working perfectly — they only read the canonical keys they already know about. The new column is simply ignored.
+If you later want to use that new column in a calculation, then you add it to KEY_MAP and write the logic. But nothing breaks automatically.
+
+Scenario 4 — Core Identity Column Renamed ❌ Must Fix
+The one column you absolutely cannot rename without a code change is the grouping key:
+jsconst entity = String(row.entity || "Unknown").trim();
+If Entity is renamed (e.g. to Company_Name or Client), the system can't group rows into companies — every row becomes "Unknown" and you get one giant merged client.
+Fix:
+js// KEY_MAP
+"company_name": "entity",   // or whatever the new name is
+"client":       "entity",
+Currently entity, organization, company, and account are all already mapped. If your rename is one of those, you're fine.
+
+Scenario 5 — isClaimsLevelData() Detection ⚠️ Possible Silent Fallback
+When the server boots, it runs this check to decide if the data is claim-level or pre-summarised:
+jsconst signals = ["illness", "facility_type", "claim_no", "approved_amount",
+  "icd_code", "member_id", "claim_type", "plan_level", "illness_group"];
+return signals.filter(f => keys.includes(f)).length >= 3;
+```
+
+It needs to find **at least 3 of these 9 canonical keys** in the first row. If multiple critical columns are renamed to unknown names simultaneously, it might fall below 3 and the server incorrectly treats your data as pre-summarised — skipping all aggregation and showing raw rows instead.
+
+You'd see this in the terminal:
+```
+[parser] 📊 Pre-summarised client data   ← wrong, means detection failed
+```
+instead of:
+```
+[parser] 🔍 HMO claim-level data — aggregating by Entity...  ← correct
+Fix: Same as always — add the new names to KEY_MAP first, and detection works again.
+
+Summary Table
+SituationAutomatic?Action RequiredColumn renamed to variant already in KEY_MAP✅ YesNothingNew column added you don't need✅ YesNothingColumn renamed to unknown new name❌ NoAdd 1 line to KEY_MAPEntity column renamed to unknown name❌ NoAdd 1 line to KEY_MAPNew column added you want to USE in KPIs❌ NoAdd to KEY_MAP + write calcMany columns renamed at once (detection fails)❌ NoAdd lines to KEY_MAP first
+
+The One File You Ever Touch
+backend/claimsCalculator.js — only the KEY_MAP object at lines 28–121.
+Everything else (dataParser, databricksConnector, server, frontend) is completely untouched. The KEY_MAP is deliberately the single point of truth for all column name variations across both data sources.
+Adding a new mapping takes 30 seconds:
+js"your_new_column_name": "canonical_key",
+```
+
+And you can always check which column names the server actually sees by hitting:
+```
+GET http://localhost:3001/api/debug/columns
+This shows the exact keys present in your loaded data after normalization, so you can verify your mapping worked.now what if other clients data comes with same column names?10:29 AMGood question. Let me check exactly how the current code handles multiple clients' data.Read the aggregation logic to see how entity grouping worksRead the aggregation logic to see how entity grouping worksRead the aggregation logic to see how entity grouping worksDoneThat's all I need to see. The answer is clear.
+
+The Answer: It Already Works Automatically ✅
+The system is already designed for exactly this scenario. Multiple clients' data — from the same or different sources — all land in the same Excel sheet or Databricks table, and the Entity column is the only thing that matters.
+Here's the entire grouping logic:
+jsconst byEntity = {};
+for (const row of claimRows) {
+  const entity = String(row.entity || "Unknown").trim();
+  if (!byEntity[entity]) byEntity[entity] = [];
+  byEntity[entity].push(row);  // ← rows sorted into buckets by company name
+}
+```
+
+Every row goes into a bucket named after its `Entity` value. Then **all 55 KPIs are calculated independently per bucket**. The companies never see each other's data at any point.
+
+---
+
+## Concrete Example
+
+Say your Excel file has 50,000 rows across 3 companies:
+```
+Entity          | Claim_No | APPROVEDAMOUNT | Illness_Group  | ...
+----------------|----------|----------------|----------------|----
+Accenture PH    | ACN-001  | 12,500         | Digestive      |
+BDO Unibank     | BDO-001  | 8,200          | Respiratory    |
+Accenture PH    | ACN-002  | 45,000         | Cardiovascular |
+Jollibee Corp   | JFC-001  | 3,100          | Dental         |
+BDO Unibank     | BDO-002  | 91,000         | Neoplasms      |
+```
+
+The system produces exactly 3 completely isolated client objects:
+- `Accenture PH` — PMPM, top diagnoses, risk score etc. calculated from only ACN rows
+- `BDO Unibank` — calculated from only BDO rows
+- `Jollibee Corp` — calculated from only JFC rows
+
+No overlap, no contamination. The column names are identical across all three — that's perfectly fine, even expected.
+
+---
+
+## What You DO Need to Watch
+
+There are only 2 things that can go wrong across multi-client data:
+
+**1. The `Entity` value must be consistent per company**
+
+If Accenture's rows say `Accenture PH` in some months and `ACCENTURE PHILIPPINES` in others, they split into two separate client cards instead of one.
+```
+"Accenture PH"           → Client card 1
+"ACCENTURE PHILIPPINES"  → Client card 2  ← wrong, should be same
+This is a data quality issue, not a code issue. The fix is standardising the Entity column in your source data — not in the code.
+2. The Masked_Member_ID must be unique per person, not recycled across companies
+Unique member count is calculated as:
+jsconst memberIdSet = new Set(rows.map(r => r.member_id));
+const members = memberIdSet.size;
+Since rows are already separated by Entity before this runs, member IDs from different companies never mix. Even if BDO and Accenture both have a member with ID EMP-00123, they're in different buckets so it doesn't matter.
+
+Summary
+SituationHandled?Same column names across all clients✅ Already works — columns are shared structure10 clients in one Excel sheet✅ Each gets isolated analytics automatically100 clients in Databricks table✅ Same — Entity grouping scales to any numberNew client added to same file✅ Shows up as new card on next reload/restartSame member ID in two different companies✅ Safe — bucketed before member countingSame Entity name spelled differently❌ Splits into two cards — fix in source data
+You don't need to touch the code at all when new client data is added. Just ensure the Entity column value is spelled consistently for each company throughout the file.
