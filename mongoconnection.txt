@@ -17,6 +17,9 @@
  *   testMongoConnection()             -- ping
  */
 
+
+authSource=%24external&authMechanism=PLAIN
+```
 const mongoose = require('mongoose');
 
 let _connected = false;
