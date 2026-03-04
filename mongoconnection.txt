@@ -1,0 +1,355 @@
+// @ts-nocheck
+/**
+ * mongoConnector.ts -- MongoDB Atlas Integration
+ * -----------------------------------------------
+ * Persists aggregated client data to MongoDB Atlas after every load.
+ * Also serves as a fast read cache for the API.
+ *
+ * Collections (all prefixed ciq_):
+ *   ciq_clients          -- aggregated client records
+ *   ciq_load_history     -- load log (source, rows, timestamp)
+ *
+ * Usage:
+ *   connectMongo()                    -- connect on boot
+ *   persistClients(clients, meta)     -- save after Excel/Databricks load
+ *   loadClientsFromMongo(filter)      -- read back
+ *   getLoadHistory()                  -- list recent loads
+ *   testMongoConnection()             -- ping
+ */
+
+const mongoose = require('mongoose');
+
+let _connected = false;
+
+// ── URI SANITIZER ────────────────────────────────────────────────
+// Handles emails and special characters in username/password
+// by parsing the URI and re-encoding credentials safely.
+function sanitizeMongoUri(uri) {
+  if (!uri) return uri;
+
+  try {
+    // Match:  scheme://user:pass@host/db?options
+    // This regex handles emails in username (contains @)
+    // Strategy: find the LAST @ before the hostname as the credential separator
+    const schemeEnd = uri.indexOf('://') + 3;
+    const scheme    = uri.slice(0, schemeEnd); // mongodb+srv://
+    const rest      = uri.slice(schemeEnd);    // user:pass@host/db?opts
+
+    // Find the last @ — everything before it is credentials, after is host
+    const lastAt    = rest.lastIndexOf('@');
+    if (lastAt === -1) return uri; // no credentials in URI
+
+    const credentials = rest.slice(0, lastAt);   // user:pass
+    const hostPart    = rest.slice(lastAt + 1);  // host/db?opts
+
+    // Split credentials into user:pass (only split on FIRST colon)
+    const colonIdx  = credentials.indexOf(':');
+    if (colonIdx === -1) return uri; // no password
+
+    const rawUser   = credentials.slice(0, colonIdx);
+    const rawPass   = credentials.slice(colonIdx + 1);
+
+    // URL-encode username and password (handles @, #, $, %, / etc)
+    const encUser   = encodeURIComponent(rawUser);
+    const encPass   = encodeURIComponent(rawPass);
+
+    const sanitized = `${scheme}${encUser}:${encPass}@${hostPart}`;
+
+    // Log sanitized URI (mask password for security)
+    const masked = `${scheme}${encUser}:****@${hostPart}`;
+    console.log('[mongo] URI (sanitized):', masked);
+
+    return sanitized;
+  } catch (e) {
+    console.warn('[mongo] URI sanitize failed, using raw URI:', e.message);
+    return uri;
+  }
+}
+
+// ── SCHEMAS ─────────────────────────────────────────────────────
+const ClientSchema = new mongoose.Schema({
+  clientId:     { type: String, required: true, index: true },
+  name:         { type: String, required: true },
+  policyYear:   { type: String, index: true },
+  source:       { type: String, default: 'excel' },
+  loadedAt:     { type: Date,   default: Date.now },
+  // Core KPIs
+  members:      Number,
+  pmpy:         Number,
+  pmpm:         Number,
+  trendPct:     Number,
+  chronicPct:   Number,
+  riskScore:    Number,
+  totalCost:    Number,
+  totalBilled:  Number,
+  totalClaims:  Number,
+  avgAge:       Number,
+  currency:     { type: String, default: '₱' },
+  // Full analytics blob
+  analytics:    mongoose.Schema.Types.Mixed,
+  // Raw meta
+  meta:         mongoose.Schema.Types.Mixed,
+}, { collection: 'ciq_clients', timestamps: true });
+
+ClientSchema.index({ clientId: 1, policyYear: 1 }, { unique: false });
+
+const LoadHistorySchema = new mongoose.Schema({
+  source:       String,
+  filePath:     String,
+  totalClients: Number,
+  totalClaims:  Number,
+  policyYears:  [String],
+  loadTimeMs:   Number,
+  status:       { type: String, default: 'success' },
+  error:        String,
+}, { collection: 'ciq_load_history', timestamps: true });
+
+let ClientModel      = null;
+let LoadHistoryModel = null;
+
+function getModels() {
+  if (!ClientModel) {
+    ClientModel      = mongoose.model('CiqClient',      ClientSchema);
+    LoadHistoryModel = mongoose.model('CiqLoadHistory', LoadHistorySchema);
+  }
+  return { ClientModel, LoadHistoryModel };
+}
+
+// ── CONNECT ─────────────────────────────────────────────────────
+async function connectMongo() {
+  const rawUri = process.env.MONGODB_URI;
+  const db     = process.env.MONGODB_DB || 'healthiqDev';
+
+  if (!rawUri) {
+    console.warn('[mongo] MONGODB_URI not set -- MongoDB disabled');
+    return false;
+  }
+
+  if (_connected) return true;
+
+  // Sanitize URI — handles emails and special chars in credentials
+  const uri = sanitizeMongoUri(rawUri);
+
+  try {
+    await mongoose.connect(uri, {
+      dbName:                    db,
+      serverSelectionTimeoutMS:  10000,  // 10s timeout
+      connectTimeoutMS:          10000,
+      socketTimeoutMS:           45000,
+      // These help with Atlas connections
+      retryWrites:               true,
+      w:                         'majority',
+    });
+
+    _connected = true;
+
+    // Safe host extraction (after sanitization, last @ is the real separator)
+    const atIdx = uri.lastIndexOf('@');
+    const host  = atIdx !== -1 ? uri.slice(atIdx + 1).split('/')[0] : 'unknown';
+    console.log(`[mongo] ✓ Connected  db=${db}  host=${host}`);
+
+    getModels();
+    return true;
+
+  } catch (e) {
+    console.warn('[mongo] ✗ Connection failed:', e.message);
+
+    // Give helpful hints based on error type
+    if (e.message.includes('Authentication failed') || e.message.includes('bad auth')) {
+      console.warn('[mongo]   → Check username and password in MONGODB_URI');
+      console.warn('[mongo]   → If password has special chars (@#$%), they need URL encoding');
+    } else if (e.message.includes('ENOTFOUND') || e.message.includes('ECONNREFUSED')) {
+      console.warn('[mongo]   → Check if you are on the correct VPN/network');
+      console.warn('[mongo]   → Check the hostname in MONGODB_URI');
+    } else if (e.message.includes('port')) {
+      console.warn('[mongo]   → mongodb+srv:// URIs must NOT include a port number');
+    }
+
+    return false;
+  }
+}
+
+function isConnected() {
+  return _connected && mongoose.connection.readyState === 1;
+}
+
+// ── PERSIST CLIENTS ─────────────────────────────────────────────
+async function persistClients(clients, meta = {}) {
+  if (!isConnected()) {
+    console.warn('[mongo] Not connected -- skipping persist');
+    return false;
+  }
+
+  const { ClientModel } = getModels();
+  const t0 = Date.now();
+
+  try {
+    const ops = clients.map(c => ({
+      updateOne: {
+        filter: {
+          clientId:   c.id,
+          policyYear: meta.policyYear || c.analytics?.latestPolicyYear || 'all',
+        },
+        update: {
+          $set: {
+            clientId:    c.id,
+            name:        c.name,
+            policyYear:  meta.policyYear || c.analytics?.latestPolicyYear || 'all',
+            source:      meta.source     || 'excel',
+            loadedAt:    new Date(),
+            members:     c.members,
+            pmpy:        c.pmpy,
+            pmpm:        c.pmpm,
+            trendPct:    c.trendPct,
+            chronicPct:  c.chronicPct,
+            riskScore:   c.riskScore,
+            totalCost:   c.totalCost,
+            totalBilled: c.totalBilled,
+            totalClaims: c.totalClaims,
+            avgAge:      c.avgAge,
+            currency:    c.currency,
+            analytics:   c.analytics,
+            meta,
+          }
+        },
+        upsert: true,
+      }
+    }));
+
+    const result  = await ClientModel.bulkWrite(ops, { ordered: false });
+    const elapsed = Date.now() - t0;
+
+    console.log(
+      `[mongo] ✓ Persisted ${clients.length} clients in ${elapsed}ms` +
+      `  (upserted: ${result.upsertedCount}, modified: ${result.modifiedCount})`
+    );
+
+    // Log to history
+    const { LoadHistoryModel } = getModels();
+    await LoadHistoryModel.create({
+      source:       meta.source       || 'excel',
+      filePath:     meta.filePath     || '',
+      totalClients: clients.length,
+      totalClaims:  meta.totalClaims  || null,
+      policyYears:  meta.policyYears  || [],
+      loadTimeMs:   elapsed,
+      status:       'success',
+    });
+
+    return true;
+
+  } catch (e) {
+    console.error('[mongo] Persist failed:', e.message);
+    return false;
+  }
+}
+
+// ── LOAD FROM MONGO ──────────────────────────────────────────────
+async function loadClientsFromMongo(filter = {}) {
+  if (!isConnected()) return null;
+
+  const { ClientModel } = getModels();
+  try {
+    const docs = await ClientModel.find(filter).lean().limit(1000);
+    if (!docs.length) return null;
+
+    const clients = docs.map(d => ({
+      id:          d.clientId,
+      name:        d.name,
+      members:     d.members,
+      pmpy:        d.pmpy,
+      pmpm:        d.pmpm,
+      trendPct:    d.trendPct,
+      chronicPct:  d.chronicPct,
+      riskScore:   d.riskScore,
+      totalCost:   d.totalCost,
+      totalBilled: d.totalBilled,
+      totalClaims: d.totalClaims,
+      avgAge:      d.avgAge,
+      currency:    d.currency    || '₱',
+      industry:    'HMO / Corporate Health',
+      country:     'Philippines',
+      meetingDate: '',
+      manager:     '',
+      renewalDate: '',
+      renewalOverdue: false,
+      analytics:   d.analytics,
+    }));
+
+    console.log(`[mongo] ✓ Loaded ${clients.length} clients from MongoDB`);
+
+    return {
+      clients,
+      stories:    [],
+      narratives: {},
+      claimsData: null,
+      sheets:     {},
+      meta: {
+        source:        'mongodb',
+        parsedAt:      new Date().toISOString(),
+        totalClients:  clients.length,
+        totalClaims:   null,
+        dataFormat:    'hmo-claims-level',
+        currency:      '₱',
+        sheetNames:    [],
+        primaryKey:    '',
+        filePath:      '',
+        loadedFromMongo: true,
+      },
+    };
+
+  } catch (e) {
+    console.error('[mongo] Load failed:', e.message);
+    return null;
+  }
+}
+
+// ── LOAD HISTORY ─────────────────────────────────────────────────
+async function getLoadHistory(limit = 20) {
+  if (!isConnected()) return [];
+  const { LoadHistoryModel } = getModels();
+  try {
+    return await LoadHistoryModel.find().sort({ createdAt: -1 }).limit(limit).lean();
+  } catch (e) {
+    return [];
+  }
+}
+
+// ── TEST CONNECTION ──────────────────────────────────────────────
+async function testMongoConnection() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    return { success: false, message: 'MONGODB_URI not set in .env', configured: false };
+  }
+
+  try {
+    if (!isConnected()) await connectMongo();
+
+    if (!isConnected()) {
+      return { success: false, configured: true, message: 'Connection failed — check logs for details' };
+    }
+
+    const { ClientModel } = getModels();
+    const count = await ClientModel.countDocuments();
+
+    return {
+      success:     true,
+      configured:  true,
+      message:     'MongoDB Atlas connected',
+      db:          process.env.MONGODB_DB || 'healthiqDev',
+      clientsInDb: count,
+    };
+
+  } catch (e) {
+    return { success: false, configured: true, message: e.message };
+  }
+}
+
+module.exports = {
+  connectMongo,
+  isConnected,
+  persistClients,
+  loadClientsFromMongo,
+  getLoadHistory,
+  testMongoConnection,
+};
