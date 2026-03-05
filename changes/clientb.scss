@@ -1,0 +1,487 @@
+@use '../../../styles/variables' as *;
+
+.briefShell { min-height: 100vh; background: $surf; }
+
+// ── Hero Band ─────────────────────────────────────────────────
+.briefHero {
+  position: relative; overflow: hidden;
+  background: $hero; background-size: 220% 220%;
+  animation: gradFlow 9s ease infinite;
+  padding: 26px 32px 30px; min-height: 96px;
+}
+.bhOrb {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  width: 320px; height: 320px; top: -130px; right: -50px;
+  background: radial-gradient(circle,rgba(233,30,140,.3) 0%,transparent 70%);
+  animation: float2 9s ease-in-out infinite;
+}
+.bhGrid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size: 32px 32px; pointer-events: none;
+}
+.briefClientRow { display: flex; align-items: center; gap: 14px; position: relative; z-index: 2; }
+.bcAvatar {
+  width: 46px; height: 46px; background: rgba(255,255,255,.14); backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255,255,255,.24); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: #fff;
+  font-family: $font-display; flex-shrink: 0;
+}
+.bcName { font-family: $font-display; font-size: 24px; font-weight: 800; color: #fff; line-height: 1.1; }
+.bcMeta { font-size: 11px; color: rgba(255,255,255,.62); margin-top: 3px; }
+
+// ── KPI Strip (4 Cards per spec) ─────────────────────────────
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: $wh;
+  border-bottom: 2px solid $bdr;
+  box-shadow: 0 2px 8px rgba(22,22,42,.04);
+}
+
+.kpiCard {
+  padding: 18px 20px 16px;
+  border-right: 1px solid $bdr-soft;
+  transition: background .18s;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, $nv, $nv-md);
+    opacity: 0; transition: opacity .2s;
+  }
+  &:hover::before { opacity: 1; }
+  &:hover { background: $surf; }
+  &:last-child { border-right: none; }
+}
+
+.kpiHead {
+  display: flex; align-items: center;
+  gap: 6px; margin-bottom: 10px;
+}
+.kpiIcon  { font-size: 14px; flex-shrink: 0; }
+.kpiLabel {
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .9px; text-transform: uppercase;
+  color: $ink-dim; line-height: 1.2;
+}
+
+.kpiMain {
+  font-family: $font-display;
+  font-size: 24px; font-weight: 800;
+  color: $ink; line-height: 1;
+  margin-bottom: 8px;
+  animation: countUp .45s ease both;
+}
+
+.kpiRow {
+  display: flex; align-items: center;
+  gap: 6px; flex-wrap: wrap; margin-bottom: 5px;
+}
+.kpiMuted { font-size: 10px; color: $ink-muted; font-weight: 500; }
+.kpiBadge {
+  font-size: 9px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  letter-spacing: .03em; white-space: nowrap;
+}
+.kpiSub { font-size: 10px; color: $ink-dim; line-height: 1.4; margin-top: 2px; }
+
+@media (max-width: 900px) {
+  .kpiStrip { grid-template-columns: repeat(2, 1fr); }
+  .kpiCard:nth-child(2) { border-right: none; }
+  .kpiCard:nth-child(1), .kpiCard:nth-child(2) { border-bottom: 1px solid $bdr-soft; }
+}
+@media (max-width: 540px) {
+  .kpiStrip { grid-template-columns: 1fr; }
+  .kpiCard  { border-right: none; border-bottom: 1px solid $bdr-soft; &:last-child { border-bottom: none; } }
+}
+
+// ── Brief Content ─────────────────────────────────────────────
+.briefBody { max-width: 1080px; margin: 0 auto; padding: 26px 22px 56px; }
+.headerRow { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+.headerLeft {}
+.eyebrow {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: $ink-dim; margin-bottom: 6px;
+}
+.eyebrowBar { width: 3px; height: 14px; background: $pk; border-radius: 2px; flex-shrink: 0; }
+.clientName { font-family: $font-display; font-size: 30px; font-weight: 800; color: $ink; line-height: 1.1; }
+.clientMeta { font-size: 12px; color: $ink-soft; margin-top: 5px; }
+.meetingBadge {
+  background: $nv-xlite; border: 1px solid $nv-lt;
+  border-radius: $r-md; padding: 12px 18px; text-align: right;
+}
+.meetingLabel { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: $ink-dim; }
+.meetingDate  { font-size: 16px; font-weight: 800; color: $nv; font-family: $font-display; margin-top: 2px; }
+.meetingWith  { font-size: 11px; color: $ink-soft; margin-top: 2px; }
+.divider { height: 1px; background: $bdr; margin-bottom: 20px; }
+
+// ── Stories Section ───────────────────────────────────────────
+.storiesHead {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.sectionLabel {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: $ink-dim;
+}
+.premiumNotice {
+  font-size: 10px; color: $ink-soft; background: $pk-xlite;
+  border: 1px solid $pk-lt; border-radius: 6px; padding: 3px 8px;
+}
+
+// ── Story Grid ────────────────────────────────────────────────
+.storyGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.storyCard {
+  background: $wh; border-radius: $r-lg; border: 1px solid $bdr;
+  padding: 18px; cursor: pointer; position: relative; overflow: hidden;
+  transition: all .3s cubic-bezier(.22,1,.36,1);
+  animation: cardPop .5s cubic-bezier(.22,1,.36,1) both;
+  &:hover { transform: translateY(-5px); box-shadow: 0 14px 44px rgba(22,22,42,.13); border-color: transparent; }
+}
+.storyLocked { cursor: default; opacity: .72; background: $surf; &:hover { transform: none; box-shadow: none; } }
+.cardTopbar        { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.cardTopbarActive  { background: linear-gradient(90deg,$pk,$pk-deep); }
+.cardTopbarLocked  { background: $bdr; }
+.iconRow  { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.storyIcon { font-size: 24px; }
+.lockBadge { font-size: 14px; }
+.premiumBadge { font-size: 9px; font-weight: 700; background: $pk-xlite; color: $pk-deep; padding: 2px 6px; border-radius: 4px; }
+.storyTitle { font-size: 15px; font-weight: 700; color: $ink; margin-bottom: 7px; line-height: 1.3; }
+.storyTitleLocked { color: $ink-soft; }
+.storyDesc { font-size: 11px; color: $ink-soft; line-height: 1.65; margin-bottom: 14px; }
+.storyFooter { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid $bdr-soft; }
+.storyCta     { font-size: 11px; font-weight: 700; color: $pk; }
+.storyUpgrade { font-size: 11px; font-weight: 700; color: $ink-soft; }
+
+// ── Raw Data Fallback ─────────────────────────────────────────
+.rawDataCard { background: $wh; border-radius: $r-lg; border: 1px solid $bdr; box-shadow: $sh-sm; overflow: auto; }
+.dataTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dataTable :global(thead th) { padding: 9px 12px; background: $surf; font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: $ink-dim; border-bottom: 1px solid $bdr; }
+.dataTable :global(tbody td) { padding: 8px 12px; border-bottom: 1px solid $bdr-soft; color: $ink-mid; }
+
+// ── Keyframes ─────────────────────────────────────────────────
+@keyframes gradFlow { 0% { background-position:0% 50% } 50% { background-position:100% 50% } 100% { background-position:0% 50% } }
+@keyframes float2   { 0%,100% { transform:translateY(0)rotate(0deg)scale(1) } 50% { transform:translateY(-20px)rotate(2deg)scale(1.03) } }
+@keyframes cardPop  { from { opacity:0; transform:translateY(28px)scale(.96) } to { opacity:1; transform:translateY(0)scale(1) } }
+@keyframes countUp  { from { opacity:0;transform:translateY(10px) } to { opacity:1;transform:translateY(0) } }
+
+
+.fourTilesGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 1px solid rgba(0,15,71,.10);
+  border-bottom: 2px solid rgba(0,15,71,.10);
+  background: #fff;
+}
+
+.tile {
+  padding: 20px 22px 24px;
+  border-right: 1px solid rgba(0,15,71,.08);
+  display: flex; flex-direction: column; gap: 14px;
+  &:last-child { border-right: none; }
+}
+
+.tileHdr {
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.tileIcon  { font-size: 20px; margin-top: 1px; flex-shrink: 0; }
+.tileTitle {
+  font-size: 13px; font-weight: 700; color: #1a1f36;
+}
+.tileSub   { font-size: 10px; color: #8892b0; margin-top: 2px; }
+.tileEmpty { font-size: 12px; color: #aab0c0; font-style: italic; }
+
+// ── Tile 1: Diagnosis list
+.diagList  { display: flex; flex-direction: column; gap: 7px; }
+.diagRow   { display: flex; align-items: center; gap: 8px; }
+.diagRank  { font-size: 9px; font-weight: 700; color: #c0c8d8; width: 18px; flex-shrink: 0; }
+.diagBody  { flex: 1; min-width: 0; }
+.diagName  { font-size: 11px; font-weight: 600; color: #1a1f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.diagBar   { height: 3px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.diagBarFill { height: 100%; background: linear-gradient(90deg, #1a237e, #e91e8c); border-radius: 2px; transition: width .5s; }
+.diagStats { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
+.diagCost  { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.diagPct   { font-size: 9px; color: #8892b0; }
+
+// ── Tile 2: High-cost
+.hcMain    { text-align: center; padding: 8px 0 4px; }
+.hcBig     { font-size: 36px; font-weight: 900; line-height: 1; }
+.hcBigLabel { font-size: 11px; color: #8892b0; margin-top: 4px; }
+.hcRows    { display: flex; flex-direction: column; gap: 6px; }
+.hcRow     { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; background: #f8f9fd; border-radius: 6px; }
+.hcLabel   { font-size: 11px; color: #6b7399; }
+.hcVal     { font-size: 12px; font-weight: 700; color: #1a1f36; }
+.hcNote    { font-size: 10px; color: #aab0c0; font-style: italic; }
+
+// ── Tile 3: Chronic
+.chronicOverall { display: flex; align-items: baseline; gap: 8px; }
+.chronicBig     { font-size: 32px; font-weight: 900; }
+.chronicBigLabel { font-size: 11px; color: #8892b0; }
+.chronicList    { display: flex; flex-direction: column; gap: 7px; }
+.chronicRow     { display: grid; grid-template-columns: 120px 1fr 60px; align-items: center; gap: 8px; }
+.chronicName    { font-size: 10px; font-weight: 600; color: #1a1f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chronicBarWrap { height: 4px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.chronicBar     { height: 100%; background: linear-gradient(90deg, #7b1fa2, #e91e8c); border-radius: 2px; transition: width .5s; }
+.chronicStats   { display: flex; justify-content: flex-end; gap: 6px; }
+.chronicCount   { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.chronicPct     { font-size: 9px; color: #8892b0; }
+
+// ── Tile 4: Risk Stratification
+.riskScore      { display: flex; align-items: center; gap: 14px; }
+.riskScoreCircle {
+  width: 70px; height: 70px; border-radius: 50%; flex-shrink: 0;
+  border: 3px solid; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.riskScoreNum   { font-size: 22px; font-weight: 900; line-height: 1; }
+.riskScoreLabel { font-size: 8px; color: #8892b0; text-transform: uppercase; letter-spacing: .5px; }
+.riskScoreMeta  { display: flex; flex-direction: column; gap: 5px; }
+.riskScoreTag   { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; display: inline-block; }
+.riskMemberCount { font-size: 11px; color: #8892b0; }
+
+.riskTiers      { display: flex; flex-direction: column; gap: 7px; }
+.riskTierRow    { display: flex; align-items: center; gap: 8px; }
+.riskTierLeft   { display: flex; align-items: center; gap: 6px; width: 64px; flex-shrink: 0; }
+.riskTierDot    { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.riskTierLabel  { font-size: 11px; font-weight: 600; color: #1a1f36; }
+.riskTierBarWrap { flex: 1; height: 5px; background: #eef0f8; border-radius: 3px; overflow: hidden; }
+.riskTierBar    { height: 100%; border-radius: 3px; transition: width .6s; }
+.riskTierRight  { display: flex; gap: 6px; align-items: center; width: 56px; justify-content: flex-end; }
+.riskTierCount  { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.riskTierPct    { font-size: 9px; color: #8892b0; }
+
+.riskFallback   { display: flex; flex-direction: column; gap: 8px; }
+.riskFallbackRow { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #f8f9fd; border-radius: 6px; font-size: 12px; color: #6b7399; }
+.riskFallbackNote { font-size: 10px; color: #aab0c0; font-style: italic; line-height: 1.4; }
+
+@media (max-width: 1024px) {
+  .fourTilesGrid { grid-template-columns: repeat(2, 1fr); }
+  .tile:nth-child(2) { border-right: none; }
+  .tile:nth-child(3) { border-top: 1px solid rgba(0,15,71,.08); }
+}
+@media (max-width: 600px) {
+  .fourTilesGrid { grid-template-columns: 1fr; }
+  .tile { border-right: none; border-bottom: 1px solid rgba(0,15,71,.08); }
+}
+
+
+// ── Four Analytics Tiles — paste at bottom of client-brief.module.scss ───────
+.fourTilesGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 1px solid rgba(0,15,71,.10);
+  border-bottom: 2px solid rgba(0,15,71,.10);
+  background: #fff;
+}
+
+.tile {
+  padding: 20px 22px 24px;
+  border-right: 1px solid rgba(0,15,71,.08);
+  display: flex; flex-direction: column; gap: 14px;
+  &:last-child { border-right: none; }
+}
+
+.tileHdr {
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.tileIcon  { font-size: 20px; margin-top: 1px; flex-shrink: 0; }
+.tileTitle {
+  font-size: 13px; font-weight: 700; color: #1a1f36;
+}
+.tileSub   { font-size: 10px; color: #8892b0; margin-top: 2px; }
+.tileEmpty { font-size: 12px; color: #aab0c0; font-style: italic; }
+
+// ── Tile 1: Diagnosis list
+.diagList  { display: flex; flex-direction: column; gap: 7px; }
+.diagRow   { display: flex; align-items: center; gap: 8px; }
+.diagRank  { font-size: 9px; font-weight: 700; color: #c0c8d8; width: 18px; flex-shrink: 0; }
+.diagBody  { flex: 1; min-width: 0; }
+.diagName  { font-size: 11px; font-weight: 600; color: #1a1f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.diagBar   { height: 3px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.diagBarFill { height: 100%; background: linear-gradient(90deg, #1a237e, #e91e8c); border-radius: 2px; transition: width .5s; }
+.diagStats { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
+.diagCost  { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.diagPct   { font-size: 9px; color: #8892b0; }
+
+// ── Tile 2: High-cost
+.hcMain    { text-align: center; padding: 8px 0 4px; }
+.hcBig     { font-size: 36px; font-weight: 900; line-height: 1; }
+.hcBigLabel { font-size: 11px; color: #8892b0; margin-top: 4px; }
+.hcRows    { display: flex; flex-direction: column; gap: 6px; }
+.hcRow     { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; background: #f8f9fd; border-radius: 6px; }
+.hcLabel   { font-size: 11px; color: #6b7399; }
+.hcVal     { font-size: 12px; font-weight: 700; color: #1a1f36; }
+.hcNote    { font-size: 10px; color: #aab0c0; font-style: italic; }
+
+// ── Tile 3: Chronic
+.chronicOverall { display: flex; align-items: baseline; gap: 8px; }
+.chronicBig     { font-size: 32px; font-weight: 900; }
+.chronicBigLabel { font-size: 11px; color: #8892b0; }
+.chronicList    { display: flex; flex-direction: column; gap: 7px; }
+.chronicRow     { display: grid; grid-template-columns: 120px 1fr 60px; align-items: center; gap: 8px; }
+.chronicName    { font-size: 10px; font-weight: 600; color: #1a1f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chronicBarWrap { height: 4px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.chronicBar     { height: 100%; background: linear-gradient(90deg, #7b1fa2, #e91e8c); border-radius: 2px; transition: width .5s; }
+.chronicStats   { display: flex; justify-content: flex-end; gap: 6px; }
+.chronicCount   { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.chronicPct     { font-size: 9px; color: #8892b0; }
+
+// ── Tile 4: Risk Stratification
+.riskScore      { display: flex; align-items: center; gap: 14px; }
+.riskScoreCircle {
+  width: 70px; height: 70px; border-radius: 50%; flex-shrink: 0;
+  border: 3px solid; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.riskScoreNum   { font-size: 22px; font-weight: 900; line-height: 1; }
+.riskScoreLabel { font-size: 8px; color: #8892b0; text-transform: uppercase; letter-spacing: .5px; }
+.riskScoreMeta  { display: flex; flex-direction: column; gap: 5px; }
+.riskScoreTag   { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; display: inline-block; }
+.riskMemberCount { font-size: 11px; color: #8892b0; }
+
+.riskTiers      { display: flex; flex-direction: column; gap: 7px; }
+.riskTierRow    { display: flex; align-items: center; gap: 8px; }
+.riskTierLeft   { display: flex; align-items: center; gap: 6px; width: 64px; flex-shrink: 0; }
+.riskTierDot    { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.riskTierLabel  { font-size: 11px; font-weight: 600; color: #1a1f36; }
+.riskTierBarWrap { flex: 1; height: 5px; background: #eef0f8; border-radius: 3px; overflow: hidden; }
+.riskTierBar    { height: 100%; border-radius: 3px; transition: width .6s; }
+.riskTierRight  { display: flex; gap: 6px; align-items: center; width: 56px; justify-content: flex-end; }
+.riskTierCount  { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.riskTierPct    { font-size: 9px; color: #8892b0; }
+
+.riskFallback   { display: flex; flex-direction: column; gap: 8px; }
+.riskFallbackRow { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #f8f9fd; border-radius: 6px; font-size: 12px; color: #6b7399; }
+.riskFallbackNote { font-size: 10px; color: #aab0c0; font-style: italic; line-height: 1.4; }
+
+@media (max-width: 1024px) {
+  .fourTilesGrid { grid-template-columns: repeat(2, 1fr); }
+  .tile:nth-child(2) { border-right: none; }
+  .tile:nth-child(3) { border-top: 1px solid rgba(0,15,71,.08); }
+}
+@media (max-width: 600px) {
+  .fourTilesGrid { grid-template-columns: 1fr; }
+  .tile { border-right: none; border-bottom: 1px solid rgba(0,15,71,.08); }
+}
+
+
+// ── Clickable Analytics Tiles (ctGrid) — paste at bottom of client-brief.module.scss ──
+.ctGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.ctCard {
+  position: relative; overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(0,15,71,.10);
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 0 0 18px;
+  transition: box-shadow .2s, transform .2s, border-color .2s;
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,.12);
+    border-color: var(--ct-accent, #1a237e);
+  }
+  &:active { transform: translateY(-1px); }
+}
+
+.ctTopbar {
+  height: 4px; width: 100%; flex-shrink: 0;
+  border-radius: 14px 14px 0 0;
+}
+
+.ctHdr {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px 16px 0;
+}
+.ctIcon  { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.ctTitle { font-size: 13px; font-weight: 700; color: #1a1f36; line-height: 1.3; }
+.ctSub   { font-size: 10px; color: #8892b0; margin-top: 2px; }
+.ctCta   {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 11px; font-weight: 700;
+  color: var(--ct-accent, #1a237e);
+  background: rgba(0,15,71,.05);
+  padding: 3px 10px; border-radius: 20px;
+  opacity: 0; transition: opacity .2s;
+  .ctCard:hover & { opacity: 1; }
+}
+.ctEmpty { font-size: 11px; color: #aab0c0; font-style: italic; padding: 0 16px; }
+.ctNote  { font-size: 10px; color: #aab0c0; font-style: italic; padding: 0 16px; }
+
+// Tile 1 — Diagnosis
+.ctDiagList { display: flex; flex-direction: column; gap: 7px; padding: 0 16px; }
+.ctDiagRow  { display: flex; align-items: center; gap: 8px; }
+.ctDiagRank { font-size: 9px; font-weight: 700; color: #c0c8d8; width: 16px; flex-shrink: 0; }
+.ctDiagBody { flex: 1; min-width: 0; }
+.ctDiagName { font-size: 10px; font-weight: 600; color: #1a1f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.ctDiagBar  { height: 3px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.ctDiagFill { height: 100%; border-radius: 2px; transition: width .5s; }
+.ctDiagMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
+.ctDiagCost { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.ctDiagPct  { font-size: 9px; color: #8892b0; }
+
+// Tile 2 — High-cost
+.ctHcMain   { text-align: center; padding: 4px 16px 0; }
+.ctHcBig    { font-size: 34px; font-weight: 900; line-height: 1; }
+.ctHcBigLbl { font-size: 10px; color: #8892b0; margin-top: 3px; line-height: 1.3; }
+.ctRows     { display: flex; flex-direction: column; gap: 5px; padding: 0 16px; }
+.ctRow      {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 10px; background: #f8f9fd; border-radius: 6px;
+  font-size: 11px; color: #6b7399;
+  strong { font-weight: 700; color: #1a1f36; }
+}
+
+// Tile 3 — Chronic
+.ctChronicMain { display: flex; align-items: baseline; gap: 8px; padding: 0 16px; }
+.ctChronicBig  { font-size: 30px; font-weight: 900; line-height: 1; }
+.ctChronicLbl  { font-size: 10px; color: #8892b0; }
+.ctChronicList { display: flex; flex-direction: column; gap: 6px; padding: 0 16px; }
+.ctChronicRow  { display: grid; grid-template-columns: 1fr 60px 28px; align-items: center; gap: 7px; }
+.ctChronicName { font-size: 10px; font-weight: 600; color: #1a1f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctChronicBarWrap { height: 4px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.ctChronicBar  { height: 100%; border-radius: 2px; transition: width .5s; }
+.ctChronicPct  { font-size: 9px; color: #8892b0; text-align: right; }
+
+// Tile 4 — Risk stratification
+.ctRiskScore { display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+.ctRiskCircle {
+  width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+  border: 3px solid; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.ctRiskNum   { font-size: 20px; font-weight: 900; line-height: 1; }
+.ctRiskLbl   { font-size: 8px; color: #8892b0; text-transform: uppercase; letter-spacing: .4px; }
+.ctRiskTag   {
+  font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 12px;
+}
+.ctTiers     { display: flex; flex-direction: column; gap: 6px; padding: 0 16px; }
+.ctTierRow   { display: flex; align-items: center; gap: 7px; }
+.ctTierLeft  { display: flex; align-items: center; gap: 5px; width: 60px; flex-shrink: 0; }
+.ctTierDot   { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.ctTierLabel { font-size: 10px; font-weight: 600; color: #1a1f36; }
+.ctTierBarWrap { flex: 1; height: 4px; background: #eef0f8; border-radius: 2px; overflow: hidden; }
+.ctTierBar   { height: 100%; border-radius: 2px; transition: width .6s; }
+.ctTierRight { display: flex; gap: 5px; align-items: center; width: 52px; justify-content: flex-end; }
+.ctTierCount { font-size: 10px; font-weight: 700; color: #1a1f36; }
+.ctTierPct   { font-size: 9px; color: #8892b0; }
+
+@media (max-width: 1024px) {
+  .ctGrid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .ctGrid { grid-template-columns: 1fr; }
+}
