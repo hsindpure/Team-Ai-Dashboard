@@ -1,12 +1,11 @@
 // @ts-nocheck
 /**
- * server.ts -- ClaimsIQ API Server
- * ─────────────────────────────────
- * Data source priority:
- *   1. Parquet cache file  (fastest — from daily Databricks sync)
- *   2. Excel file          (dev/demo fallback)
- *   3. Databricks direct   (slowest — only if FORCE_DATABRICKS=true)
- *   4. MongoDB Atlas       (optional persist layer)
+ * server.ts -- ClaimsIQ API Server v3.0
+ * ────────────────────────────────────────
+ * Boot priority:
+ *   1. JSON cache  (dataFile/claimsiq_cache.json)  ← ~2 seconds (from npm run sync)
+ *   2. Excel file  (dataFile/Insurence.xlsx)        ← ~5 seconds (dev fallback)
+ *   3. Databricks  (FORCE_DATABRICKS=true only)     ← 5-10 minutes (explicit only)
  */
 require('dotenv').config();
 const express = require('express');
@@ -16,8 +15,9 @@ const morgan  = require('morgan');
 const path    = require('path');
 const fs      = require('fs');
 
+// ── IMPORTS ───────────────────────────────────────────────────
 const {
-  parseXlsx, loadParquet, isParquetAvailable, getParquetMeta,
+  parseXlsx, loadJsonCache, isJsonCacheAvailable, getJsonCacheMeta,
   getCache, clearCache, startWatcher, _setCache,
 } = require('./dataParser');
 
@@ -34,6 +34,7 @@ const {
   testMongoConnection, getLoadHistory, isConnected: isMongoConnected,
 } = require('./mongoConnector');
 
+// ── CONFIG ────────────────────────────────────────────────────
 const app       = express();
 const PORT      = process.env.PORT      || 3001;
 const XLSX_PATH = process.env.XLSX_FILE || 'dataFile/Insurence.xlsx';
@@ -43,9 +44,10 @@ const PERSIST   = process.env.MONGO_PERSIST !== 'false';
 let activeSource    = 'none';
 let databricksCache = null;
 
+// ── MIDDLEWARE ────────────────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
-  origin: ['http://localhost:3000','http://localhost:3001','http://localhost:5173'],
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
   credentials: true,
 }));
 app.use(express.json());
@@ -54,22 +56,17 @@ if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 // ── ACTIVE CACHE RESOLVER ─────────────────────────────────────
 function getActiveCache() {
   if (activeSource === 'databricks' && databricksCache) return databricksCache;
-  return getCache();
+  return getCache(); // works for both 'excel' and 'json_cache'
 }
 
 // ── LOADERS ───────────────────────────────────────────────────
-async function loadFromParquet() {
-  if (!isParquetAvailable()) return false;
+function loadJsonCacheSource() {
   try {
-    await loadParquet();
-    activeSource = 'parquet';
-    const meta = getParquetMeta();
-    if (meta?.exportedAt) {
-      console.log(`[boot] 📦 Parquet exported: ${meta.exportedAt}`);
-    }
+    loadJsonCache();
+    activeSource = 'json_cache';
     return true;
   } catch (e) {
-    console.error('[boot] Parquet load failed:', e.message);
+    console.error('[boot] JSON cache load failed:', e.message);
     return false;
   }
 }
@@ -89,7 +86,7 @@ function loadExcel() {
 
 async function loadDatabricks() {
   if (!isDatabricksConfigured()) {
-    console.warn('[boot] Databricks not configured');
+    console.warn('[boot] Databricks not configured — check .env');
     return false;
   }
   try {
@@ -118,24 +115,41 @@ async function maybePersist(cache) {
 
 // ── ROUTES: System ────────────────────────────────────────────
 app.get('/api/health', (_, res) => res.json({
-  success: true, status: 'ok', time: new Date().toISOString(),
-  dataSource: activeSource, mongoConnected: isMongoConnected(),
+  success:        true,
+  status:         'ok',
+  time:           new Date().toISOString(),
+  dataSource:     activeSource,
+  mongoConnected: isMongoConnected(),
 }));
 
 app.get('/api/source', (_, res) => {
   let meta = {};
   try { meta = getActiveCache().meta || {}; } catch {}
-  const parquetMeta = getParquetMeta();
+  const cm = getJsonCacheMeta();
   res.json({
-    success: true, activeSource,
+    success:              true,
+    activeSource,
+    jsonCacheAvailable:   isJsonCacheAvailable(),
+    jsonCacheSyncedAt:    cm?.syncedAt      || null,
+    jsonCacheClients:     cm?.totalClients  || null,
+    jsonCacheSizeKb:      cm?.fileSizeKb    || null,
     xlsxAvailable:        fs.existsSync(path.resolve(XLSX_PATH)),
-    parquetAvailable:     isParquetAvailable(),
-    parquetExportedAt:    parquetMeta?.exportedAt || null,
-    parquetTotalClients:  parquetMeta?.totalClients || null,
-    parquetTotalClaims:   parquetMeta?.totalClaims || null,
     databricksConfigured: isDatabricksConfigured(),
     mongoConnected:       isMongoConnected(),
     meta,
+  });
+});
+
+app.get('/api/cache/status', (_, res) => {
+  const cm        = getJsonCacheMeta();
+  const available = isJsonCacheAvailable();
+  res.json({
+    success:   true,
+    available,
+    meta:      cm || null,
+    message:   available
+      ? `Cache available — synced ${cm?.syncedAt || 'unknown'}`
+      : 'No cache file found. Run: npm run sync',
   });
 });
 
@@ -143,27 +157,13 @@ app.get('/api/databricks/status', async (_, res) => res.json(await testDatabrick
 app.get('/api/mongo/status',      async (_, res) => res.json(await testMongoConnection()));
 app.get('/api/mongo/history',     async (_, res) => res.json({ success: true, history: await getLoadHistory() }));
 
-// Parquet file info endpoint
-app.get('/api/parquet/status', (_, res) => {
-  const available = isParquetAvailable();
-  const meta      = getParquetMeta();
-  res.json({
-    success:   true,
-    available,
-    meta:      meta || null,
-    message:   available
-      ? `Parquet cache available — exported ${meta?.exportedAt || 'unknown'}`
-      : 'No parquet file found. Run: npm run sync',
-  });
-});
-
 // ── ROUTES: Data ──────────────────────────────────────────────
 app.get('/api/all', (_, res) => {
   try {
     const { clients, stories, narratives, meta } = getActiveCache();
     res.json({ success: true, clients, stories, narratives, meta, dataSource: activeSource });
   } catch (e) {
-    res.status(503).json({ success: false, error: e.message });
+    res.status(503).json({ success: false, error: e.message, hint: 'Run: npm run sync' });
   }
 });
 
@@ -179,8 +179,12 @@ app.get('/api/clients', (_, res) => {
 app.get('/api/client/:id', (req, res) => {
   try {
     const { clients } = getActiveCache();
-    const c = clients.find(c => String(c.id).toLowerCase() === req.params.id.toLowerCase());
-    if (!c) return res.status(404).json({ success: false, error: `Client "${req.params.id}" not found.` });
+    const c = clients.find(c =>
+      String(c.id).toLowerCase() === req.params.id.toLowerCase()
+    );
+    if (!c) return res.status(404).json({
+      success: false, error: `Client "${req.params.id}" not found.`
+    });
     res.json({ success: true, data: c, dataSource: activeSource });
   } catch (e) {
     res.status(503).json({ success: false, error: e.message });
@@ -192,7 +196,7 @@ app.get('/api/sheets', (_, res) => {
     const { sheets } = getActiveCache();
     res.json({
       success: true,
-      sheets: Object.keys(sheets || {}).map(k => ({ key: k, count: sheets[k].length })),
+      sheets:  Object.keys(sheets || {}).map(k => ({ key: k, count: sheets[k].length })),
     });
   } catch (e) {
     res.status(503).json({ success: false, error: e.message });
@@ -204,8 +208,8 @@ app.post('/api/reload', async (req, res) => {
   try {
     clearAiCache();
     if      (activeSource === 'databricks') { databricksCache = null; await loadDatabricks(); }
-    else if (activeSource === 'parquet')    { await loadFromParquet(); }
-    else                                    { clearCache(); parseXlsx(XLSX_PATH); }
+    else if (activeSource === 'json_cache') { clearCache(); loadJsonCacheSource(); }
+    else                                    { clearCache(); loadExcel(); }
     const cache = getActiveCache();
     await maybePersist(cache);
     res.json({ success: true, message: `Reloaded from ${activeSource}.`, meta: cache.meta });
@@ -214,18 +218,18 @@ app.post('/api/reload', async (req, res) => {
   }
 });
 
-app.post('/api/reload/parquet', async (req, res) => {
+app.post('/api/reload/cache', async (req, res) => {
   try {
     clearCache(); clearAiCache();
-    const ok = await loadFromParquet();
-    if (!ok) {
+    if (!isJsonCacheAvailable()) {
       return res.status(404).json({
         success: false,
-        error:   'Parquet file not found.',
+        error:   'JSON cache file not found.',
         hint:    'Run: npm run sync  to generate it from Databricks',
       });
     }
-    res.json({ success: true, message: 'Reloaded from parquet cache.', meta: getCache().meta });
+    loadJsonCacheSource();
+    res.json({ success: true, message: 'Reloaded from JSON cache.', meta: getCache().meta });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -234,16 +238,14 @@ app.post('/api/reload/parquet', async (req, res) => {
 app.post('/api/reload/excel', async (req, res) => {
   try {
     clearCache(); clearAiCache();
-    const ok = loadExcel();
-    if (!ok) {
+    if (!loadExcel()) {
       return res.status(404).json({
         success: false,
-        error:  `Excel not found: ${path.resolve(XLSX_PATH)}`,
+        error:   `Excel not found: ${path.resolve(XLSX_PATH)}`,
       });
     }
-    const cache = getActiveCache();
-    await maybePersist(cache);
-    res.json({ success: true, message: 'Reloaded from Excel.', meta: cache.meta });
+    await maybePersist(getActiveCache());
+    res.json({ success: true, message: 'Reloaded from Excel.', meta: getCache().meta });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -252,8 +254,9 @@ app.post('/api/reload/excel', async (req, res) => {
 app.post('/api/reload/databricks', async (req, res) => {
   try {
     clearAiCache(); databricksCache = null;
-    const ok = await loadDatabricks();
-    if (!ok) return res.status(500).json({ success: false, error: 'Databricks load failed.' });
+    if (!await loadDatabricks()) {
+      return res.status(500).json({ success: false, error: 'Databricks load failed.' });
+    }
     await maybePersist(databricksCache);
     res.json({ success: true, message: 'Reloaded from Databricks.', meta: databricksCache.meta });
   } catch (e) {
@@ -275,9 +278,9 @@ app.post('/api/ai/analyze', async (req, res) => {
   const client = cacheData.clients.find(
     c => String(c.id).toLowerCase() === String(clientId).toLowerCase()
   );
-  if (!client) {
-    return res.status(404).json({ success: false, error: `Client "${clientId}" not found.` });
-  }
+  if (!client) return res.status(404).json({
+    success: false, error: `Client "${clientId}" not found.`
+  });
 
   const xlsxMetrics = cacheData.narratives?.[storyId]?.metrics || [];
   if (forceRefresh) deleteAiCacheEntry(`${clientId}_${storyId}`);
@@ -285,42 +288,60 @@ app.post('/api/ai/analyze', async (req, res) => {
   try {
     const result = await generateAiAnalysis({ client, storyId, xlsxMetrics });
     res.json({
-      success: true, clientId, storyId,
-      fromCache: result.fromCache, dataSource: activeSource,
-      analysis: result,
+      success:   true,
+      clientId,  storyId,
+      fromCache: result.fromCache,
+      dataSource:activeSource,
+      analysis:  result,
     });
   } catch (e) {
     res.status(500).json({
-      success: false, error: e.message,
-      hint: e.message.includes('OPENROUTER_API_KEY')
+      success: false,
+      error:   e.message,
+      hint:    e.message.includes('OPENROUTER_API_KEY')
         ? 'Add OPENROUTER_API_KEY to backend/.env'
-        : 'AI failed -- check logs',
+        : 'AI generation failed — check logs',
     });
   }
 });
 
 app.get('/api/ai/cache',    (_, res) => res.json({ success: true, ...getAiCacheStatus() }));
-app.delete('/api/ai/cache', (_, res) => { clearAiCache(); res.json({ success: true, message: 'AI cache cleared.' }); });
+app.delete('/api/ai/cache', (_, res) => {
+  clearAiCache();
+  res.json({ success: true, message: 'AI cache cleared.' });
+});
 
-// ── DEBUG ─────────────────────────────────────────────────────
+// ── ROUTES: Debug ─────────────────────────────────────────────
 app.get('/api/debug/columns', (_, res) => {
   try {
     const cache  = getActiveCache();
     const result = {};
     Object.entries(cache.sheets || {}).forEach(([k, rows]) => {
-      result[k] = { rowCount: rows.length, columns: rows.length ? Object.keys(rows[0]) : [], sample: rows[0] };
+      result[k] = {
+        rowCount: rows.length,
+        columns:  rows.length ? Object.keys(rows[0]) : [],
+        sample:   rows[0],
+      };
     });
     res.json({
-      success: true, dataSource: activeSource,
-      totalClients: cache.clients.length, sheets: result, meta: cache.meta,
+      success:      true,
+      dataSource:   activeSource,
+      totalClients: cache.clients.length,
+      sheets:       result,
+      meta:         cache.meta,
     });
   } catch (e) {
     res.status(503).json({ success: false, error: e.message });
   }
 });
 
-app.use((req, res) => res.status(404).json({ success: false, error: `Not found: ${req.method} ${req.url}` }));
-app.use((err, _req, res, _next) => res.status(500).json({ success: false, error: 'Internal error.' }));
+// ── 404 & ERROR HANDLERS ──────────────────────────────────────
+app.use((req, res) =>
+  res.status(404).json({ success: false, error: `Not found: ${req.method} ${req.url}` })
+);
+app.use((err, _req, res, _next) =>
+  res.status(500).json({ success: false, error: 'Internal server error.' })
+);
 
 // ── BOOT ──────────────────────────────────────────────────────
 async function boot() {
@@ -328,42 +349,68 @@ async function boot() {
   console.log('  Marsh ClaimsIQ v3.0 -- API Server');
   console.log('════════════════════════════════════════\n');
 
-  // MongoDB — optional, non-blocking
-  await connectMongo();
+  // MongoDB — optional, never blocks boot
+  connectMongo().catch(() => {});
 
-  const xlsxExists    = fs.existsSync(path.resolve(XLSX_PATH));
-  const parquetExists = isParquetAvailable();
+  const xlsxExists      = fs.existsSync(path.resolve(XLSX_PATH));
+  const jsonCacheExists = isJsonCacheAvailable();
 
-  // ── Priority 1: Parquet cache (production default — fast) ──
-  if (!FORCE_DB && parquetExists) {
-    console.log('[boot] 📦 Parquet cache found — loading...');
-    const ok = await loadFromParquet();
-    if (!ok) {
-      console.warn('[boot] Parquet failed — falling back to Excel');
-      if (xlsxExists) { loadExcel(); }
-      else { console.error('[boot] ✗ No data source available'); process.exit(1); }
+  // Always log what was found so you know why a source was chosen
+  console.log(`[boot] FORCE_DATABRICKS : ${FORCE_DB}`);
+  console.log(`[boot] JSON cache exists: ${jsonCacheExists}`);
+  console.log(`[boot] Excel exists     : ${xlsxExists}`);
+
+  // ── Priority 1: JSON cache ─────────────────────────────────
+  // Generated by: npm run sync
+  // Stored at:    backend/dataFile/claimsiq_cache.json
+  // Never committed to GitHub (.gitignore)
+  if (!FORCE_DB && jsonCacheExists) {
+    console.log('[boot] 📦 JSON cache found — loading...');
+    const ok = loadJsonCacheSource();
+    if (ok) {
+      const m = getJsonCacheMeta();
+      console.log(`[boot] ✓ Ready. Cache synced at: ${m?.syncedAt || 'unknown'}`);
+    } else {
+      // Cache file exists but is corrupt — fall back to Excel
+      console.warn('[boot] ⚠  Cache corrupt — falling back to Excel...');
+      if (xlsxExists) {
+        loadExcel();
+        startWatcher(XLSX_PATH);
+      } else {
+        console.error('[boot] ✗ No fallback available. Run: npm run sync');
+        process.exit(1);
+      }
     }
 
-  // ── Priority 2: Excel (dev/demo fallback) ──────────────────
+  // ── Priority 2: Excel ──────────────────────────────────────
   } else if (!FORCE_DB && xlsxExists) {
-    console.log('[boot] 📊 No parquet — using Excel file');
+    console.log('[boot] 📊 No JSON cache — loading Excel file...');
+    console.log('[boot]    Tip: Run  npm run sync  to create a fast JSON cache');
     const ok = loadExcel();
-    if (!ok) { console.error('[boot] ✗ Excel parse failed'); process.exit(1); }
+    if (!ok) {
+      console.error('[boot] ✗ Excel parse failed');
+      process.exit(1);
+    }
     startWatcher(XLSX_PATH);
     await maybePersist(getCache());
 
-  // ── Priority 3: Databricks direct (slow, avoid in prod) ───
+  // ── Priority 3: Databricks ─────────────────────────────────
+  // Only runs when FORCE_DATABRICKS=true OR nothing else exists
   } else {
-    console.log(FORCE_DB
-      ? '[boot] ⚡ FORCE_DATABRICKS=true — connecting directly...'
-      : '[boot] ⚠  No parquet or Excel found — trying Databricks...'
-    );
-    console.warn('[boot]    This is slow (5-10 mins). Run: npm run sync');
+    if (FORCE_DB) {
+      console.log('[boot] ⚡ FORCE_DATABRICKS=true — loading Databricks directly...');
+      console.log('[boot]    This is slow (5-10 mins). Set FORCE_DATABRICKS=false after running npm run sync');
+    } else {
+      console.warn('[boot] ⚠  No JSON cache or Excel found.');
+      console.warn('[boot]    Run: npm run sync  to generate the JSON cache from Databricks');
+      console.warn('[boot]    Attempting Databricks as last resort...');
+    }
     const ok = await loadDatabricks();
     if (!ok) {
       console.error('[boot] ✗ All data sources failed.');
-      console.error('         Run: npm run sync   to generate parquet cache');
-      console.error('         Or place Excel at: ' + XLSX_PATH);
+      console.error('         Solutions:');
+      console.error('         1. Run: npm run sync  (generates JSON cache from Databricks)');
+      console.error('         2. Place Excel at: ' + path.resolve(XLSX_PATH));
       process.exit(1);
     }
     await maybePersist(databricksCache);
@@ -372,15 +419,15 @@ async function boot() {
   // AI key check
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey || apiKey === 'your_openrouter_api_key_here') {
-    console.warn('[boot] ⚠  OPENROUTER_API_KEY not set -- AI disabled');
+    console.warn('[boot] ⚠  OPENROUTER_API_KEY not set -- AI features disabled');
   } else {
-    console.log(`[boot] 🤖 AI: ${process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct'}`);
+    console.log(`[boot] 🤖 AI ready: ${process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct'}`);
   }
 
   app.listen(PORT, () => {
-    console.log(`\n✅ Server  http://localhost:${PORT}`);
-    console.log(`📊 Source: ${activeSource.toUpperCase()}`);
-    console.log(`🍃 Mongo:  ${isMongoConnected() ? 'Connected' : 'Disconnected'}\n`);
+    console.log(`\n✅ Server   http://localhost:${PORT}`);
+    console.log(`📊 Source  : ${activeSource.toUpperCase()}`);
+    console.log(`🍃 MongoDB : ${isMongoConnected() ? 'Connected' : 'Disconnected'}\n`);
   });
 }
 
