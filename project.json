@@ -1,0 +1,13 @@
+"sync": {
+  "executor": "nx:run-commands",
+  "options": {
+    "cwd": "apps/api",
+    "commands": [
+      {
+        "command": "npx ts-node --transpile-only src/syncCache.ts",
+        "forwardAllArgs": false
+      }
+    ],
+    "parallel": false
+  }
+},
