@@ -1,0 +1,176 @@
+@use '../../../styles/variables' as *;
+
+.avShell { min-height: 100vh; background: $surf; }
+
+// ── Hero ──────────────────────────────────────────────────────
+.avHero {
+  position: relative; overflow: hidden;
+  background: $hero; background-size: 220% 220%;
+  animation: gradFlow 9s ease infinite;
+  padding: 18px 32px 26px;
+}
+.avHeroOrb {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  width: 260px; height: 260px; top: -100px; right: -20px;
+  background: radial-gradient(circle,rgba(233,30,140,.24) 0%,transparent 70%);
+  animation: float2 10s ease-in-out infinite;
+}
+.avHeroGrid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size: 32px 32px; pointer-events: none;
+}
+.avBack {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: rgba(255,255,255,.62); font-size: 11px; font-weight: 600;
+  margin-bottom: 8px; cursor: pointer; position: relative; z-index: 2; transition: color .2s;
+  &:hover { color: #fff; }
+}
+.avHeroTitle {
+  font-family: $font-display; font-size: 28px; font-weight: 800; color: #fff;
+  line-height: 1.15; position: relative; z-index: 2;
+  animation: fadeUp .5s cubic-bezier(.22,1,.36,1) both;
+}
+.avHeroSub   { font-size: 12px; color: rgba(255,255,255,.58); margin-top: 4px; position: relative; z-index: 2; }
+.avHeroActions { position: absolute; top: 18px; right: 22px; z-index: 2; display: flex; gap: 8px; }
+.avRegen {
+  display: flex; align-items: center; gap: 5px; padding: 6px 13px;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.1); backdrop-filter: blur(8px);
+  color: #fff; font-size: 11px; font-weight: 600; transition: all .2s;
+  &:hover { background: rgba(255,255,255,.18); }
+  &:disabled { opacity: .5; pointer-events: none; }
+}
+
+// ── Body ──────────────────────────────────────────────────────
+.avBody { max-width: 1080px; margin: 0 auto; padding: 24px 22px 56px; display: flex; flex-direction: column; gap: 18px; }
+
+// ── Tags ──────────────────────────────────────────────────────
+.avTags { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.avTag {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+  border-radius: 20px; font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase;
+  border: 1px solid $bdr; background: $wh; color: $ink-soft;
+  &.ai   { background: $nv-xlite; border-color: $nv-lt; color: $nv; }
+  &.live { background: $grn-lt; border-color: #c8e6c9; color: $grn; }
+  &.busy { background: $pk-xlite; border-color: $pk-lt; color: $pk-deep; }
+}
+
+// ── Summary strip ─────────────────────────────────────────────
+.avStrip {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  background: $wh; border-radius: $r-lg; border: 1px solid $bdr;
+  overflow: hidden; box-shadow: $sh-sm;
+}
+.avSk { padding: 13px 16px; border-right: 1px solid $bdr-soft; &:last-child { border-right: none; } }
+.avSkL { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: $ink-dim; margin-bottom: 4px; }
+.avSkV { font-size: 17px; font-weight: 800; color: $ink; font-family: $font-display; }
+.avSkVBad { color: $red !important; }
+.avSkS { font-size: 9px; color: $ink-dim; margin-top: 2px; }
+
+// ── Metric tiles ──────────────────────────────────────────────
+.avMetrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+.avMt {
+  background: $wh; border-radius: $r-md; border: 1px solid $bdr;
+  padding: 14px; position: relative; overflow: hidden;
+  transition: transform .2s, box-shadow .2s;
+  animation: cardPop .5s cubic-bezier(.22,1,.36,1) both;
+  &:hover { transform: translateY(-2px); box-shadow: $sh-md; }
+}
+.avMtBar  { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: $r-md $r-md 0 0; }
+.avMtL { font-size: 9px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: $ink-dim; margin-bottom: 5px; }
+.avMtV { font-size: 19px; font-weight: 800; color: $ink; font-family: $font-display; }
+.avMtD { font-size: 10px; font-weight: 600; margin-top: 3px; }
+.avMtB { font-size: 9px; color: $ink-dim; margin-top: 2px; }
+
+// ── 2-column layout ───────────────────────────────────────────
+.avMain { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
+.avLeft { display: flex; flex-direction: column; gap: 20px; }
+.avRight { display: flex; flex-direction: column; gap: 14px; }
+
+// ── Headline card ─────────────────────────────────────────────
+.avHlCard { background: $wh; border-radius: $r-lg; border: 1px solid $bdr; box-shadow: $sh-sm; padding: 22px; }
+.avHlText { font-family: $font-display; font-size: 21px; font-weight: 700; color: $ink; line-height: 1.42; margin-bottom: 12px; }
+.avHlTextHl { color: $pk-deep; font-weight: 800; }
+.avHlSub    { font-size: 12px; color: $ink-soft; line-height: 1.72; }
+.avChips { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid $bdr-soft; }
+.avChipL { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: $ink-dim; margin-bottom: 4px; }
+.avChipV { font-size: 18px; font-weight: 800; color: $ink; font-family: $font-display; }
+.avChipVBad { color: $red; }
+.avChipS { font-size: 9px; color: $ink-dim; margin-top: 2px; }
+
+// ── Chart card ────────────────────────────────────────────────
+.avChartCard { background: $wh; border-radius: $r-lg; border: 1px solid $bdr; box-shadow: $sh-sm; padding: 18px; }
+.avChartLbl  { font-size: 11px; font-weight: 700; color: $ink; margin-bottom: 12px; }
+.avChartSublabel { font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: $ink-dim; margin-bottom: 8px; }
+
+// ── AI card (dark navy) ───────────────────────────────────────
+.avAi {
+  background: $nv; border-radius: $r-lg; padding: 18px; position: relative; overflow: hidden;
+  &::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(233,30,140,.14) 0%,transparent 55%); pointer-events:none; }
+}
+.avAiLbl   { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.48); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.avAiText  { font-size: 12px; color: rgba(255,255,255,.82); line-height: 1.72; position: relative; }
+.avConfRow { display: flex; gap: 5px; margin-top: 12px; flex-wrap: wrap; }
+.avConf    { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.14); color: rgba(255,255,255,.68); }
+
+// ── Action card ───────────────────────────────────────────────
+.avAction    { background: $wh; border-radius: $r-lg; border: 1px solid $bdr; box-shadow: $sh-sm; padding: 16px; }
+.avActionLbl { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: $ink-dim; margin-bottom: 8px; }
+.avActionTxt { font-size: 12px; color: $ink-soft; line-height: 1.72; }
+.avActionBtn {
+  display: block; width: 100%; margin-top: 12px; padding: 8px; border-radius: 8px;
+  background: $grn; color: #fff; font-size: 11px; font-weight: 700; text-align: center;
+  transition: background .2s, transform .2s;
+  &:hover { background: $teal; transform: translateY(-1px); }
+}
+
+// ── Talking points ────────────────────────────────────────────
+.avTp { background: $wh; border-radius: $r-lg; border: 1px solid $bdr; box-shadow: $sh-sm; padding: 18px; }
+.avTpHdr     { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.avTpTtl     { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: $ink-dim; }
+.avTpHint    { font-size: 10px; color: $ink-dim; }
+.avTpCopy { padding: 4px 10px; border-radius: 6px; background: $ink; color: #fff; font-size: 10px; font-weight: 700; transition: all .2s; &.ok { background: $grn !important; } }
+.avTpDivider { height: 1px; background: $bdr-soft; margin-bottom: 10px; }
+.avTpRow {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 7px; border-radius: 8px; cursor: pointer; transition: background .15s; margin-bottom: 2px;
+  &:hover { background: $surf; }
+  &.on { background: $pk-xlite; }
+}
+.avTpCheck { width: 16px; height: 16px; border-radius: 50%; background: $grn-lt; border: 1.5px solid #a5d6a7; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.avTpTxt   { font-size: 12px; color: $ink-soft; line-height: 1.52; flex: 1; }
+.avTpBadge { font-size: 8px; font-weight: 700; background: $nv-lt; color: $nv; padding: 1px 5px; border-radius: 4px; margin-left: 5px; }
+.avTpEmpty { font-size: 12px; color: $ink-dim; padding: 10px 0; }
+.avAddSec  { margin-top: 12px; padding-top: 12px; border-top: 1px solid $bdr-soft; }
+.avAddLbl  { font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: $ink-dim; margin-bottom: 7px; }
+.avAddRow  { display: flex; gap: 7px; }
+.avAddIn   { flex: 1; padding: 7px 11px; border-radius: 8px; border: 1px solid $bdr; font-size: 11px; color: $ink; outline: none; transition: border-color .2s; &:focus { border-color: $pk; } }
+.avAddBtn  { padding: 7px 13px; border-radius: 8px; background: $ink; color: #fff; font-size: 11px; font-weight: 700; transition: background .2s; &:hover { background: $nv; } &.ok { background: $grn !important; } }
+.avExpRow  { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid $bdr-soft; }
+.avExpNote { font-size: 10px; color: $ink-dim; }
+.avExpBtn  { padding: 7px 14px; border-radius: 8px; background: $pk; color: #fff; font-size: 11px; font-weight: 700; transition: all .2s; &:hover { background: $pk-deep; transform: translateY(-1px); box-shadow: $sh-pk; } &.done { background: $grn !important; } }
+
+// ── Skeleton ──────────────────────────────────────────────────
+.avSkeleton { border-radius: 5px; background: linear-gradient(90deg,$bdr 25%,$bdr-soft 50%,$bdr 75%); background-size: 600px 100%; animation: shimmer 1.4s ease-in-out infinite; }
+
+// ── Error ─────────────────────────────────────────────────────
+.avErr { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px; background: $red-lt; border: 1px solid #f5c6cb; }
+.avErrIco   { font-size: 16px; color: $red; }
+.avErrTtl   { font-weight: 700; color: $red; font-size: 12px; }
+.avErrBody  { font-size: 11px; color: $ink-soft; margin-top: 2px; }
+.avErrRetry { padding: 5px 10px; border-radius: 7px; background: $red; color: #fff; font-size: 11px; font-weight: 600; margin-left: auto; flex-shrink: 0; }
+
+// ── Tooltip ───────────────────────────────────────────────────
+.avTooltip      { background: $ink; border-radius: 8px; padding: 9px 13px; color: #fff; font-size: 11px; box-shadow: $sh-lg; }
+.avTooltipLabel { font-weight: 700; margin-bottom: 3px; color: rgba(255,255,255,.6); font-size: 10px; }
+.avTooltipRow   { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.avTooltipDot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+// ── Keyframes ─────────────────────────────────────────────────
+@keyframes gradFlow { 0% { background-position:0% 50% } 50% { background-position:100% 50% } 100% { background-position:0% 50% } }
+@keyframes float2   { 0%,100% { transform:translateY(0)rotate(0deg)scale(1) } 50% { transform:translateY(-20px)rotate(2deg)scale(1.03) } }
+@keyframes cardPop  { from { opacity:0; transform:translateY(28px)scale(.96) } to { opacity:1; transform:translateY(0)scale(1) } }
+@keyframes fadeUp   { from { opacity:0; transform:translateY(22px) } to { opacity:1; transform:translateY(0) } }
+@keyframes shimmer  { from { background-position:-700px 0 } to { background-position:700px 0 } }
