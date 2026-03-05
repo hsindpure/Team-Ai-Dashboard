@@ -1,0 +1,118 @@
+@use '../../../styles/variables' as *;
+
+.navbar {
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 56px;
+  background: $wh; border-bottom: 1px solid $bdr;
+  box-shadow: 0 1px 12px rgba(22,22,42,.07);
+  gap: 12px;
+}
+
+// ── Brand ─────────────────────────────────────────────────────
+.brand { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
+.logo {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, $pk-deep, $pk);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-family: $font-display; font-size: 13px; font-weight: 800; color: #fff;
+  box-shadow: 0 2px 8px rgba(233,30,140,.30);
+}
+.brandName {
+  font-family: $font-display; font-weight: 800; font-size: 15px;
+  color: $ink; letter-spacing: -.2px;
+}
+
+// ── Client Switcher ───────────────────────────────────────────
+.navCompany {
+  display: flex; align-items: center; gap: 8px;
+  background: $surf; border: 1px solid $bdr;
+  border-radius: 8px; padding: 5px 10px 5px 12px;
+  cursor: pointer; transition: border-color .2s, box-shadow .2s;
+  min-width: 200px; flex: 1; max-width: 280px;
+  &:hover { border-color: $pk-lt; box-shadow: 0 0 0 3px rgba(233,30,140,.06); }
+}
+.coIcon {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, $nv, $nv-md);
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 8px; font-weight: 800; flex-shrink: 0;
+}
+.navSel {
+  appearance: none; background: transparent; border: none; outline: none;
+  font-size: 12px; font-weight: 600; color: $ink; cursor: pointer;
+  flex: 1; min-width: 0;
+}
+.coChev { font-size: 9px; color: $ink-dim; flex-shrink: 0; }
+
+// ── Right ─────────────────────────────────────────────────────
+.navRight { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+// ── Local / Multinational Toggle ──────────────────────────────
+.scopeWrap {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 10px; border-radius: 20px;
+  border: 1px solid $bdr; background: $surf;
+  cursor: pointer; user-select: none;
+  transition: border-color .22s, box-shadow .22s, background .22s;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: $nv-lt;
+    box-shadow: 0 0 0 3px rgba(0,15,71,.06);
+  }
+}
+.scopeWrapMulti {
+  border-color: $pk-lt;
+  background: $pk-xlite;
+  &:hover { border-color: $pk; box-shadow: 0 0 0 3px rgba(233,30,140,.08); }
+}
+
+.scopeLabel {
+  font-size: 10px; font-weight: 600; letter-spacing: .03em;
+  color: $ink-muted; transition: color .22s;
+  white-space: nowrap;
+}
+.scopeLabelOn { color: $ink; font-weight: 700; }
+
+.scopeTrack {
+  position: relative; width: 30px; height: 16px;
+  border-radius: 10px; background: $bdr;
+  transition: background .25s cubic-bezier(.4,0,.2,1);
+  flex-shrink: 0;
+}
+.scopeTrackOn { background: $pk; }
+
+.scopeThumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.22);
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+}
+.scopeThumbOn { transform: translateX(14px); }
+
+// ── Reload ────────────────────────────────────────────────────
+.reload {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 7px;
+  border: 1px solid $bdr;
+  font-size: 11px; font-weight: 600; color: $ink-dim;
+  background: $wh; transition: all .2s; cursor: pointer;
+  white-space: nowrap;
+  &:hover { border-color: $pk; color: $pk; }
+  &.busy { opacity: .6; pointer-events: none; }
+}
+.spinIcon { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+// ── User ──────────────────────────────────────────────────────
+.user { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, $nv, $pk-deep);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.userName { font-size: 11px; font-weight: 700; color: $ink; line-height: 1.2; }
+.userRole  { font-size: 9px; color: $ink-dim; letter-spacing: .5px; text-transform: uppercase; }
