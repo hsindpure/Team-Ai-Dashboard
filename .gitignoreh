@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+dataFile/*.json
+dataFile/*.parquet
+dataFile/*.xlsx
+!dataFile/.gitkeep
+
+touch backend/dataFile/.gitkeep
+git add backend/dataFile/.gitkeep
