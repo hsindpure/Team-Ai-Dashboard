@@ -48,7 +48,10 @@ const ClientSchema = new mongoose.Schema({
   loadedAt:      { type: Date,   default: Date.now },
   members:       Number, pmpy: Number, pmpm: Number,
   trendPct:      Number, chronicPct: Number, riskScore: Number,
-  compositeScore: Number, clientStatus: String,
+  compositeScore:     Number,
+  clientStatus:       String,   // Stable | Drifting | Accelerating | Improving
+  compositeBreakdown: mongoose.Schema.Types.Mixed, // { trendScore, utilScore, popRiskScore, costEffScore }
+  threeYearProjection:mongoose.Schema.Types.Mixed, // { pmpy, pct, totalCost, hasProjection }
   totalCost:     Number, totalBilled: Number, totalClaims: Number,
   avgAge:        Number, currency: { type: String, default: '₱' },
   analytics:     mongoose.Schema.Types.Mixed,
@@ -155,6 +158,8 @@ async function persistClients(clients, meta = {}) {
           pmpm:           c.pmpm,       trendPct:      c.trendPct,
           chronicPct:     c.chronicPct, riskScore:     c.riskScore,
           compositeScore: c.compositeScore, clientStatus: c.clientStatus,
+          compositeBreakdown:  c.compositeBreakdown,
+          threeYearProjection: c.threeYearProjection,
           totalCost:      c.totalCost,  totalBilled:   c.totalBilled,
           totalClaims:    c.totalClaims, avgAge:        c.avgAge,
           currency:       c.currency,   analytics:     c.analytics,
@@ -186,7 +191,10 @@ async function loadClientsFromMongo(filter = {}) {
       id: d.clientId, name: d.name, members: d.members, pmpy: d.pmpy,
       pmpm: d.pmpm, trendPct: d.trendPct, chronicPct: d.chronicPct,
       riskScore: d.riskScore, compositeScore: d.compositeScore,
-      clientStatus: d.clientStatus, totalCost: d.totalCost,
+      clientStatus: d.clientStatus,
+      compositeBreakdown:   d.compositeBreakdown,
+      threeYearProjection:  d.threeYearProjection,
+      totalCost: d.totalCost,
       totalBilled: d.totalBilled, totalClaims: d.totalClaims,
       avgAge: d.avgAge, currency: d.currency || '₱',
       industry: 'HMO / Corporate Health', country: 'Philippines',
