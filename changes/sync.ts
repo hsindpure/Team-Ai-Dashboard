@@ -47,8 +47,9 @@ let SyncHistoryModel = null;
 
 function getModels() {
   if (!RawClaimModel) {
-    RawClaimModel    = mongoose.model('CiqRawClaim',    RawClaimSchema);
-    SyncHistoryModel = mongoose.model('CiqSyncHistory', SyncHistorySchema);
+    // Use existing model if already registered (prevents OverwriteModelError on re-run)
+    RawClaimModel    = mongoose.models['CiqRawClaim']    || mongoose.model('CiqRawClaim',    RawClaimSchema);
+    SyncHistoryModel = mongoose.models['CiqSyncHistory'] || mongoose.model('CiqSyncHistory', SyncHistorySchema);
   }
   return { RawClaimModel, SyncHistoryModel };
 }
@@ -116,7 +117,7 @@ const LatestSyncSchema = new mongoose.Schema({
 let LatestSyncModel = null;
 
 async function writeLatestPointer(syncId, totalRows) {
-  if (!LatestSyncModel) LatestSyncModel = mongoose.model('CiqLatestSync', LatestSyncSchema);
+  if (!LatestSyncModel) LatestSyncModel = mongoose.models['CiqLatestSync'] || mongoose.model('CiqLatestSync', LatestSyncSchema);
   await LatestSyncModel.findOneAndUpdate(
     { _id: 'latest' },
     { syncId, syncedAt: new Date(), totalRows },
