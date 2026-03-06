@@ -1,13 +1,21 @@
 // @ts-nocheck
 /**
- * databricksConnector.ts -- Databricks SQL Connector
- * ---------------------------------------------------
- * Connects to Databricks, introspects columns dynamically,
- * fetches claim-level data, aggregates via claimsCalculator.
- * Zero hardcoded column names -- schema-adaptive.
+ * databricksConnector.ts -- Databricks SQL Connector  v3.2
+ * ----------------------------------------------------------
+ * Schema-adaptive connector. Zero hardcoded column names.
  *
- * Fix v3.1: All selected columns are backtick-quoted individually
- * to prevent Databricks parsing "Plan_Description" as STRUCT access.
+ * Changes v3.2:
+ *   - Added all columns visible in the actual Databricks table (Image 1)
+ *   - Backtick-quotes every selected column individually (fixes STRUCT error)
+ *   - Added: country, source_system_code, admission_date, discharge_date,
+ *     claim_payment_date, file_date, room_type, reject_category,
+ *     rejection_reasons, policy_number, entity_code, client_demo,
+ *     member_reference_date, members_effective_date,
+ *     members_original_effective_date, relationship_1, claim_type_1,
+ *     claim_type_level2, maskedmemberid_icd, case_tag, industry_group
+ *   - "Plan" column now explicitly mapped to plan_level (was root cause of
+ *     [INVALID_EXTRACT_BASE_FIELD_TYPE] STRUCT error)
+ *   - "Paid_Claim" / "Paid_Claim_DOUBLE" both mapped to approved_amount
  */
 
 const { aggregateClaimsToClients, isClaimsLevelData, normalizeRow } = require('./claimsCalculator');
@@ -21,42 +29,234 @@ const DB_CONFIG = {
   maxRows: parseInt(process.env.DATABRICKS_MAX_ROWS || '500000'),
 };
 
-// All known column name variants across old and new schemas
+// ── KNOWN COLUMN VARIANTS ────────────────────────────────────────
+// Every variant that has ever appeared across schemas.
+// Ordered: most-likely-to-match first for speed.
+// Key = internal role name, Value = array of raw column name variants.
 const KNOWN_COLUMN_VARIANTS = {
-  policy_year:      ['Policy_Year','PolicyYear','policy_year','POLICY_YEAR','Year','year','YEAR'],
-  month:            ['Month','month','MONTH'],
-  month_name:       ['Month_Name','MonthName','month_name','MONTH_NAME'],
-  month_year:       ['Month_Year','MonthYear','month_year','MONTH_YEAR'],
-  quarter:          ['New_Quarter','NewQuarter','new_quarter','Quarter','quarter','QUARTER'],
-  fund:             ['Fund','fund','FUND','Insurer','insurer'],
-  claim_type:       ['Final_Claim_Type','FinalClaimType','final_claim_type','Claim_Type','ClaimType','claim_type','Claim_Type__group_','Claim_Definition'],
-  member_type:      ['Member_Type','MemberType','member_type','Provider_Category'],
-  relationship:     ['Relationship','relationship','Relationship__group_'],
-  icd_code:         ['ICD_Code2','ICDCode2','icd_code2','ICD_Code','icd_code','Icd_9'],
-  illness:          ['Illness','illness','Diagnosis_Major'],
-  illness_group:    ['Illness_Group','IllnessGroup','illness_group','Grouped_Diagnosis_Updated_','Grouped_Diagnosis_Updated','Grouped_Diagnosis'],
-  facility:         ['Facility','facility','Provider_Name','Providers__Hospitals_'],
-  facility_type:    ['Type_of_Facility','TypeOfFacility','type_of_facility','Facility_Type','facility_type','Provider_Type'],
-  case_count:       ['Case_Count','CaseCount','case_count'],
-  claim_no:         ['Claim_No','ClaimNo','claim_no','Claim_ID','claim_id'],
-  plan_level:       ['Plan_Level','PlanLevel','plan_level'],
-  plan_description: ['Plan_Description','PlanDescription','plan_description'],
-  age:              ['Age','age','AGE'],
-  age_group:        ['Age_Group','AgeGroup','age_group','Age_Band','AgeBand','Age_Band__group_'],
-  year_of_birth:    ['Year_of_Birth','YearOfBirth','year_of_birth'],
-  gender:           ['Gender','gender','GENDER','Gender__group_'],
-  civil_status:     ['Civil_Status','CivilStatus','civil_status','Fili_Status'],
-  billed_amount:    ['Billed_Amount','BilledAmount','billed_amount','Submitted_Claim_Amount'],
-  covered_amount:   ['Covered_Amount','CoveredAmount','covered_amount'],
-  approved_amount:  ['APPROVEDAMOUNT','Approved_Amount','ApprovedAmount','approved_amount','Paid_Claim'],
-  member_id:        ['Masked_Member_ID','MaskedMemberID','masked_member_id','Masked_Employee_ID','MaskedEmployeeID','Member_ID','Employee_ID'],
-  entity:           ['Entity','entity','ENTITY','Company','company','Organization','Client_Name_Updated_','Client_Name','Client_ID'],
-  branch:           ['Branch','branch','Provider_Location'],
-  category:         ['Category','category','Industry1','Industry__group_','Industry','industry'],
-  status:           ['Status','status','Claim_status','ClaimStatus'],
-  mbl:              ['MBL','mbl','Max_Benefit_Limit'],
+
+  // ── TIME ──────────────────────────────────────────────────────
+  policy_year: [
+    'Policy_Year','PolicyYear','policy_year','POLICY_YEAR','Year','year','YEAR',
+  ],
+  month: [
+    'Month','month','MONTH',
+  ],
+  month_name: [
+    'Month_Name','MonthName','month_name','MONTH_NAME',
+  ],
+  month_year: [
+    'Month_Year','MonthYear','month_year','MONTH_YEAR',
+  ],
+  quarter: [
+    'New_Quarter','NewQuarter','new_quarter','Quarter','quarter','QUARTER',
+  ],
+
+  // ── CLAIM IDENTIFIERS ─────────────────────────────────────────
+  claim_no: [
+    'Claim_No','ClaimNo','claim_no','Claim_ID','claim_id','Claim_ID',
+  ],
+  claim_type: [
+    'Final_Claim_Type','FinalClaimType','final_claim_type',
+    'Claim_Type','ClaimType','claim_type',
+    'Claim_Type__group_','Claim_Type_group','Claim_Type_1',
+    'Claim_Definition',
+  ],
+  claim_type_level2: [
+    'Claim_Type_Level_2','ClaimTypeLevel2','claim_type_level_2',
+  ],
+  status: [
+    'Claim_status','ClaimStatus','claim_status','Status','status','STATUS',
+    'Claim_Status_1',
+  ],
+  reject_category: [
+    'Reject_claim_category','RejectClaimCategory','reject_claim_category',
+  ],
+  rejection_reasons: [
+    'Rejection_Reasons','RejectionReasons','rejection_reasons',
+  ],
+  case_count: [
+    'Case_Count','CaseCount','case_count',
+  ],
+  case_tag: [
+    'Case_Tag','CaseTag','case_tag',
+  ],
+  room_type: [
+    'Room_Type','RoomType','room_type',
+  ],
+  policy_number: [
+    'Policy_Number','PolicyNumber','policy_number',
+  ],
+  fund: [
+    'Fund','fund','FUND','Insurer','insurer',
+  ],
+
+  // ── DATES ─────────────────────────────────────────────────────
+  admission_date: [
+    'Admission_Date','AdmissionDate','admission_date',
+  ],
+  discharge_date: [
+    'Discharge_Date','DischargeDate','discharge_date','Discharhge_Date',
+  ],
+  claim_payment_date: [
+    'Claim_Payment_Date','ClaimPaymentDate','claim_payment_date',
+  ],
+  file_date: [
+    'File_Date','FileDate','file_date',
+  ],
+  members_effective_date: [
+    'Members_Effective_Date','MembersEffectiveDate','members_effective_date',
+  ],
+  members_original_effective_date: [
+    'Members_Original_Effective_Date','MembersOriginalEffectiveDate',
+    'members_original_effective_date',
+  ],
+  member_reference_date: [
+    'Member_Reference_Date','MemberReferenceDate','member_reference_date',
+  ],
+
+  // ── MEMBER / DEMOGRAPHICS ─────────────────────────────────────
+  member_id: [
+    'Masked_Member_ID','MaskedMemberID','masked_member_id',
+    'Masked_Employee_ID','MaskedEmployeeID','masked_employee_id',
+    'Employee_Masked_ID','EmployeeMaskedID',
+    'Member_ID','MemberID','member_id',
+    'Employee_ID','EmployeeID','employee_id',
+  ],
+  member_icd_tag: [
+    'MaskedMemberID_ICD','Masked_MemberID_ICD','maskedmemberid_icd',
+  ],
+  member_type: [
+    'Member_Type','MemberType','member_type',
+    'Provider_Category','ProviderCategory','provider_category',
+  ],
+  relationship: [
+    'Relationship','relationship','RELATIONSHIP',
+    'Relationship__group_','Relationship_group',
+    'Relationship_1',
+  ],
+  age: [
+    'Age','age','AGE',
+  ],
+  age_group: [
+    'Age_Group','AgeGroup','age_group',
+    'Age_Band','AgeBand','age_band',
+    'Age_Band__group_','Age_Group_1',
+  ],
+  year_of_birth: [
+    'Year_of_Birth','YearOfBirth','year_of_birth',
+  ],
+  gender: [
+    'Gender','gender','GENDER',
+    'Gender__group_','Gender_group',
+  ],
+  civil_status: [
+    'Civil_Status','CivilStatus','civil_status',
+    'Fili_Status','Civil_Status_1',
+  ],
+
+  // ── ENTITY / CLIENT ───────────────────────────────────────────
+  entity: [
+    'Entity','entity','ENTITY',
+    'Client_Name_Updated_','Client_Name_Updated',
+    'Client_Name','ClientName',
+    'Client_ID','ClientID',
+    'Entity_Name','EntityName',
+    'Company','company','Organization',
+  ],
+  entity_code: [
+    'Entity_code','EntityCode','entity_code','Entity_Code',
+  ],
+  client_demo: [
+    'Client_Demo','ClientDemo','client_demo',
+  ],
+  country: [
+    'country','Country','COUNTRY',
+  ],
+  source_system_code: [
+    'source_system_code','SourceSystemCode','Source_System_Code',
+  ],
+  category: [
+    'Category','category','CATEGORY',
+    'Industry1','Industry__group_','Industry_group',
+    'Industry','industry',
+  ],
+  branch: [
+    'Branch','branch','BRANCH',
+    'Provider_Location','ProviderLocation',
+  ],
+
+  // ── DIAGNOSIS / ILLNESS ───────────────────────────────────────
+  icd_code: [
+    'ICD_Code2','ICDCode2','icd_code2',
+    'ICD_Code','icd_code','ICD_CODE',
+    'Icd_9',
+  ],
+  illness: [
+    'Illness','illness','ILLNESS',
+    'Diagnosis_Major','DiagnosisMajor',
+  ],
+  illness_group: [
+    'Illness_Group','IllnessGroup','illness_group',
+    'Grouped_Diagnosis_Updated_','Grouped_Diagnosis_Updated',
+    'Grouped_Diagnosis',
+  ],
+
+  // ── FACILITY ──────────────────────────────────────────────────
+  facility: [
+    'Facility','facility',
+    'Provider_Name','ProviderName',
+    'Providers__Hospitals_','Providers_Hospitals',
+  ],
+  facility_type: [
+    'Type_of_Facility','TypeOfFacility','type_of_facility',
+    'Facility_Type','FacilityType','facility_type',
+    'Provider_Type','ProviderType',
+  ],
+
+  // ── PLAN ──────────────────────────────────────────────────────
+  // NOTE: "Plan" MUST be listed here explicitly -- without backtick quoting
+  // Databricks parses it as a STRUCT and throws INVALID_EXTRACT_BASE_FIELD_TYPE
+  plan_level: [
+    'Plan_Level','PlanLevel','plan_level',
+    'Plan',   // ← bare "Plan" column in Databricks table -- backtick fix handles this
+  ],
+  plan_description: [
+    'Plan_Description','PlanDescription','plan_description',
+  ],
+  plan_start_date: [
+    'Plan_Start_Date','PlanStartDate','plan_start_date',
+  ],
+  plan_end_date: [
+    'Plan_End_Date','PlanEndDate','plan_end_date',
+  ],
+
+  // ── AMOUNTS ───────────────────────────────────────────────────
+  approved_amount: [
+    'APPROVEDAMOUNT','Approved_Amount','ApprovedAmount','approved_amount',
+    'Paid_Claim','PaidClaim','paid_claim',
+    'Paid_Claim_DOUBLE',           // Databricks column with type suffix
+  ],
+  billed_amount: [
+    'Billed_Amount','BilledAmount','billed_amount',
+    'Submitted_Claim_Amount','SubmittedClaimAmount',
+  ],
+  covered_amount: [
+    'Covered_Amount','CoveredAmount','covered_amount',
+  ],
+
+  // ── LIMITS ────────────────────────────────────────────────────
+  mbl: [
+    'MBL','mbl','Max_Benefit_Limit','MaxBenefitLimit',
+  ],
+
+  // ── META ──────────────────────────────────────────────────────
+  filename: [
+    'FileName','Filename','filename','FILENAME','File_Name',
+  ],
 };
 
+// ── DB CLIENT ────────────────────────────────────────────────────
 let DBSQLClient = null;
 function getDBClient() {
   if (!DBSQLClient) {
@@ -74,13 +274,13 @@ function isDatabricksConfigured() {
 }
 
 // ── SAFE COLUMN LIST ─────────────────────────────────────────────
-// Each matched column is wrapped in backticks individually.
-// This prevents Databricks from interpreting "Plan_Description"
-// as a STRUCT field access (Plan.Description) which causes:
-// [INVALID_EXTRACT_BASE_FIELD_TYPE] Can't extract a value from "Plan"
+// Each matched column is backtick-wrapped individually.
+// This prevents Databricks parsing "Plan_Description" as Plan.Description
+// (STRUCT access) which throws [INVALID_EXTRACT_BASE_FIELD_TYPE].
 function buildSafeColumnList(actualColumns) {
   const actualMap = {};
   actualColumns.forEach(c => {
+    // Normalise: lowercase, strip spaces/dots/underscores/parens for fuzzy match
     const key = c.toLowerCase().replace(/[\s._()-]/g, '');
     actualMap[key] = c;
   });
@@ -93,9 +293,8 @@ function buildSafeColumnList(actualColumns) {
       if (actualMap[key]) { found = actualMap[key]; break; }
     }
     if (found) {
-      // ✅ Backtick-wrap each column name individually
-      selected.push(`\`${found}\``);
-      resolvedCols[role] = found; // store raw name (no backticks) for WHERE clause
+      selected.push(`\`${found}\``);   // ← backtick each column individually
+      resolvedCols[role] = found;       // raw name kept for WHERE clause
     }
   }
 
@@ -105,6 +304,13 @@ function buildSafeColumnList(actualColumns) {
   }
 
   console.log(`[databricks] ✓ Matched ${selected.length}/${Object.keys(KNOWN_COLUMN_VARIANTS).length} columns`);
+  // Log unmatched roles for debugging
+  const matched = new Set(Object.keys(resolvedCols));
+  const unmatched = Object.keys(KNOWN_COLUMN_VARIANTS).filter(r => !matched.has(r));
+  if (unmatched.length) {
+    console.log(`[databricks]   Unmatched roles: ${unmatched.join(', ')}`);
+  }
+
   return { columnList: selected.join(', '), resolvedCols };
 }
 
@@ -114,7 +320,6 @@ function buildClaimsQuery(tableName, options = {}) {
   let sql = `SELECT ${columnList} FROM ${tableName}`;
 
   if (years && years.length > 0) {
-    // resolvedCols stores raw column name -- wrap in backticks for WHERE too
     const yearCol = resolvedCols['policy_year'];
     if (yearCol) {
       sql += ` WHERE \`${yearCol}\` IN (${years.map(y => `'${y}'`).join(', ')})`;
@@ -127,23 +332,23 @@ function buildClaimsQuery(tableName, options = {}) {
 
 // ── TABLE INTROSPECTION ───────────────────────────────────────────
 async function getTableColumns(session, tableName) {
-  // Try DESCRIBE first
+  // Strategy 1: DESCRIBE TABLE
   try {
     const op = await session.executeStatement(
-      `DESCRIBE TABLE ${tableName}`, { runAsync: true, maxRows: 200 }
+      `DESCRIBE TABLE ${tableName}`, { runAsync: true, maxRows: 300 }
     );
     const rows = await op.fetchAll();
     await op.close();
     const cols = rows
       .map(r => r.col_name || r.column_name || r.name || '')
-      .filter(c => c && !c.startsWith('#'));
+      .filter(c => c && !c.startsWith('#') && !c.startsWith(' '));
     if (cols.length > 0) {
       console.log(`[databricks] ✓ DESCRIBE returned ${cols.length} columns`);
       return cols;
     }
   } catch (e) { console.warn('[databricks] DESCRIBE failed:', e.message); }
 
-  // Fallback: SELECT * LIMIT 1 to read column names from result
+  // Strategy 2: SELECT * LIMIT 1 -- read keys from first row
   try {
     const op = await session.executeStatement(
       `SELECT * FROM ${tableName} LIMIT 1`, { runAsync: true, maxRows: 1 }
@@ -173,7 +378,8 @@ async function discoverClaimsTable(session) {
   } catch (e) { return null; }
 }
 
-// ── FETCH RAW ROWS (used by sync.ts -- no aggregation here) ──────
+// ── FETCH RAW ROWS ────────────────────────────────────────────────
+// Called by sync.ts -- returns raw rows, NO aggregation here.
 async function fetchClaimsFromDatabricks() {
   if (!isDatabricksConfigured()) {
     throw new Error(
@@ -196,6 +402,11 @@ async function fetchClaimsFromDatabricks() {
 
     const years         = DB_CONFIG.years ? DB_CONFIG.years.split(',').map(y => y.trim()) : null;
     const actualColumns = await getTableColumns(session, tableName);
+
+    if (actualColumns.length === 0) {
+      throw new Error(`Could not introspect columns from ${tableName}. Check table name and permissions.`);
+    }
+
     const { columnList, resolvedCols } = buildSafeColumnList(actualColumns);
 
     const sql = buildClaimsQuery(tableName, {
@@ -203,7 +414,7 @@ async function fetchClaimsFromDatabricks() {
     });
 
     console.log(`[databricks] Querying: ${tableName}`);
-    console.log('[databricks] SQL:', sql.slice(0, 300));
+    console.log('[databricks] SQL preview:', sql.slice(0, 400));
 
     const op   = await session.executeStatement(sql, { runAsync: true, maxRows: DB_CONFIG.maxRows });
     const rows = await op.fetchAll();
@@ -220,16 +431,16 @@ async function fetchClaimsFromDatabricks() {
 }
 
 // ── LOAD + AGGREGATE (legacy -- kept for backward compat) ─────────
-// Note: in the new sync flow, aggregation happens in server.ts after
-// reading from MongoDB. This function is no longer called on boot.
+// In the new sync flow, aggregation happens in server.ts after
+// reading raw rows from MongoDB. This is not called on boot.
 async function loadDatabricksData() {
   const t0      = Date.now();
   const rawRows = await fetchClaimsFromDatabricks();
   if (!rawRows || rawRows.length === 0) throw new Error('Databricks returned 0 rows.');
 
   console.log(`[databricks] Aggregating ${rawRows.length.toLocaleString()} claims...`);
-  const clients   = aggregateClaimsToClients(rawRows);
-  const elapsed   = ((Date.now() - t0) / 1000).toFixed(1);
+  const clients     = aggregateClaimsToClients(rawRows);
+  const elapsed     = ((Date.now() - t0) / 1000).toFixed(1);
   const policyYears = [...new Set(clients.map(c => c.analytics?.latestPolicyYear).filter(Boolean))];
   console.log(`[databricks] ✓ ${clients.length} clients in ${elapsed}s`);
 
@@ -255,7 +466,7 @@ async function testDatabricksConnection() {
     const client = getDBClient();
     await client.connect({ token: DB_CONFIG.token, host: DB_CONFIG.host, path: DB_CONFIG.path });
     const session = await client.openSession();
-    let rowCount = null;
+    let rowCount = null, columnCount = null;
     if (DB_CONFIG.table) {
       try {
         const op = await session.executeStatement(
@@ -264,12 +475,17 @@ async function testDatabricksConnection() {
         const res = await op.fetchAll(); await op.close();
         rowCount = res[0]?.cnt || null;
       } catch (e) {}
+      try {
+        const cols = await getTableColumns(session, DB_CONFIG.table);
+        columnCount = cols.length;
+      } catch (e) {}
     }
     await session.close(); await client.close();
     return {
       success: true, configured: true,
       message: 'Databricks connection successful',
-      host: DB_CONFIG.host, table: DB_CONFIG.table || 'not set', rowCount,
+      host: DB_CONFIG.host, table: DB_CONFIG.table || 'not set',
+      rowCount, columnCount,
     };
   } catch (e) {
     return {
