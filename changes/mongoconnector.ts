@@ -68,10 +68,10 @@ let _models = {};
 
 function getModels() {
   if (!_models.Client) {
-    _models.RawClaim    = mongoose.model('CiqRawClaim',    RawClaimSchema);
-    _models.SyncPointer = mongoose.model('CiqSyncPointer', SyncPointerSchema);
-    _models.Client      = mongoose.model('CiqClient',      ClientSchema);
-    _models.LoadHistory = mongoose.model('CiqLoadHistory', LoadHistorySchema);
+    _models.RawClaim    = mongoose.models['CiqRawClaim']    || mongoose.model('CiqRawClaim',    RawClaimSchema);
+    _models.SyncPointer = mongoose.models['CiqSyncPointer'] || mongoose.model('CiqSyncPointer', SyncPointerSchema);
+    _models.Client      = mongoose.models['CiqClient']      || mongoose.model('CiqClient',      ClientSchema);
+    _models.LoadHistory = mongoose.models['CiqLoadHistory'] || mongoose.model('CiqLoadHistory', LoadHistorySchema);
   }
   return _models;
 }
