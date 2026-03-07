@@ -1,0 +1,4 @@
+"debug:calc": "ts-node --transpile-only src/debugCalc.ts"
+
+# then run anytime:
+npm run debug:calc
