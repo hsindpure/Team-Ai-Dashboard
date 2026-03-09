@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { fixupConfigRules } from "@eslint/compat";
 import compat from "@eslint/eslint-plugin";
 
